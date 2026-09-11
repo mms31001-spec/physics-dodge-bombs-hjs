@@ -51,7 +51,11 @@
   .splash.fade-out{opacity:0; pointer-events:none;}
 
   .stage-select{
-    position:fixed; inset:0;
+    position:fixed;
+    top:50%; left:50%;
+    transform:translate(-50%, -50%);
+    width:min(100vw, calc(100vh * (720/420)));
+    aspect-ratio:720/420;
     background:#0A0A0A;
     display:none;
     flex-direction:column; align-items:center; justify-content:center;
@@ -62,8 +66,8 @@
     overflow-y:auto;
     box-sizing:border-box;
   }
+  .stage-select.fade-out{transform:translate(-50%, -50%); opacity:0; pointer-events:none;}
   .stage-select.show{display:flex;}
-  .stage-select.fade-out{opacity:0; pointer-events:none;}
   .stage-select-heading{
     font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
     font-size:clamp(13px, 4vh, 30px); font-weight:700; color:#FFFFFF;
@@ -196,7 +200,7 @@
     flex-direction:column;
     align-items:center; justify-content:center;
     gap:14px;
-    z-index:900;
+    z-index:1100;
     text-align:center;
     padding:20px;
   }
@@ -2535,6 +2539,7 @@
     }
     startNewShot();
     introDone = false;
+    updateRotateOverlay();
 
     stageSelectEl.classList.remove('fade-out');
     if(!document.body.contains(stageSelectEl)){
@@ -2633,11 +2638,12 @@
   const startGameBtn = document.getElementById('startGameBtn');
   const rotateOverlay = document.getElementById('rotateOverlay');
 
+  let rotateCheckActive = false;
   function isPortrait(){
     return window.innerHeight > window.innerWidth;
   }
   function updateRotateOverlay(){
-    if(!introDone) return;
+    if(!rotateCheckActive) return;
     rotateOverlay.classList.toggle('show', isPortrait());
   }
   window.addEventListener('resize', updateRotateOverlay);
@@ -2661,6 +2667,8 @@
     stageSelectEl.classList.add('show');
     splashEl.classList.add('fade-out');
     tryStartAudio();
+    rotateCheckActive = true;
+    updateRotateOverlay();
     setTimeout(()=>{
       splashEl.remove();
     }, 1000);
