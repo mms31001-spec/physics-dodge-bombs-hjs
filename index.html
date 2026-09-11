@@ -51,23 +51,25 @@
   .splash.fade-out{opacity:0; pointer-events:none;}
 
   .stage-select{
-    position:fixed;
-    top:50%; left:50%;
-    transform:translate(-50%, -50%);
-    width:min(100vw, calc(88vh * (720/420)));
-    aspect-ratio:720/420;
+    position:fixed; inset:0;
     background:#0A0A0A;
     display:none;
-    flex-direction:column; align-items:center; justify-content:center;
-    gap:0.8vh;
+    align-items:center; justify-content:center;
     z-index:999;
     transition:opacity 1s ease;
+    overflow:hidden;
+  }
+  .stage-select.fade-out{opacity:0; pointer-events:none;}
+  .stage-select.show{display:flex;}
+  .stage-select-box{
+    width:min(100vw, calc(88vh * (720/420)));
+    aspect-ratio:720/420;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:0.8vh;
     padding:0.8vh 2vw;
     overflow-y:auto;
     box-sizing:border-box;
   }
-  .stage-select.fade-out{transform:translate(-50%, -50%); opacity:0; pointer-events:none;}
-  .stage-select.show{display:flex;}
   .stage-select-heading{
     font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
     font-size:clamp(15px, 5vh, 34px); font-weight:700; color:#FFFFFF;
@@ -95,7 +97,7 @@
     background:rgba(255,251,242,0.06);
     border:1px solid rgba(255,255,255,0.25);
     border-radius:4px;
-    padding:2.6vh 0.6vw;
+    padding:2.6vh 0.4vw;
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.4vh;
     min-width:0;
   }
@@ -104,23 +106,32 @@
   }
   .stage-card-title{
     font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
-    font-size:clamp(13px, 3.1vh, 22px); color:#F2EDE0;
+    font-size:clamp(8px, min(2.7vh, 2.3vw), 18px); color:#F2EDE0;
     text-align:center;
-    letter-spacing:0.02em;
+    letter-spacing:0;
     line-height:1.3;
+    white-space:nowrap;
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .stage-card-btn, .stage-card-pending{
+    font-family:inherit; font-size:clamp(11px, 2.3vh, 16px); font-weight:600; border-radius:2px;
+    width:3vh; height:3vh; padding:0;
+    display:flex; align-items:center; justify-content:center;
+    box-sizing:border-box;
+    flex:none;
   }
   .stage-card-btn{
-    font-family:inherit; font-size:clamp(12px, 2.6vh, 18px); font-weight:600; border-radius:2px;
-    width:3.2em; height:3.2em; padding:0; cursor:pointer; border:1px solid #FFFFFF;
+    cursor:pointer; border:1px solid #FFFFFF;
     background:#FFFFFF; color:#0A0A0A;
-    display:flex; align-items:center; justify-content:center;
     -webkit-tap-highlight-color:transparent;
   }
   .stage-card-btn:active{ transform:scale(0.96); }
   .stage-card-pending{
-    font-family:inherit; font-size:clamp(12px, 2.6vh, 18px); font-weight:600;
+    border:1px solid rgba(242,237,224,0.4);
+    background:transparent;
     color:rgba(242,237,224,0.6);
-    letter-spacing:0.04em;
   }
   .stage-select-footer{
     width:100%;
@@ -562,46 +573,48 @@
   <div class="splash-version" id="splashVersion">v1.0</div>
 </div>
 <div class="stage-select" id="stageSelect">
-  <div class="stage-select-heading">물리학으로 폭탄 피하기</div>
-  <div class="stage-select-title">스테이지 선택</div>
-  <div class="stage-select-grid">
-    <div class="stage-card">
-      <div class="stage-card-title">stage1: 운동의 구역</div>
-      <button type="button" class="stage-card-btn" data-stage="1">선택</button>
+  <div class="stage-select-box">
+    <div class="stage-select-heading">물리학으로 폭탄 피하기</div>
+    <div class="stage-select-title">스테이지 선택</div>
+    <div class="stage-select-grid">
+      <div class="stage-card">
+        <div class="stage-card-title">stage1: 운동의 구역</div>
+        <button type="button" class="stage-card-btn" data-stage="1">선택</button>
+      </div>
+      <div class="stage-card">
+        <div class="stage-card-title">stage2: 충격량의 구역</div>
+        <button type="button" class="stage-card-btn" data-stage="2">선택</button>
+      </div>
+      <div class="stage-card disabled">
+        <div class="stage-card-title">stage3: 에너지의 구역</div>
+        <span class="stage-card-pending">준비중</span>
+      </div>
+      <div class="stage-card disabled">
+        <div class="stage-card-title">stage4: 열의 구역</div>
+        <span class="stage-card-pending">준비중</span>
+      </div>
+      <div class="stage-card disabled">
+        <div class="stage-card-title">stage5: 전기의 구역</div>
+        <span class="stage-card-pending">준비중</span>
+      </div>
+      <div class="stage-card disabled">
+        <div class="stage-card-title">stage6: 자기의 구역</div>
+        <span class="stage-card-pending">준비중</span>
+      </div>
+      <div class="stage-card disabled">
+        <div class="stage-card-title">stage7: 빛의 구역</div>
+        <span class="stage-card-pending">준비중</span>
+      </div>
+      <div class="stage-card disabled">
+        <div class="stage-card-title">stage8: 원자의 구역</div>
+        <span class="stage-card-pending">준비중</span>
+      </div>
     </div>
-    <div class="stage-card">
-      <div class="stage-card-title">stage2: 충격량의 구역</div>
-      <button type="button" class="stage-card-btn" data-stage="2">선택</button>
+    <div class="stage-select-footer">
+      <p>제작: 물리교사 한재상(경남교육청 과학교육원, 2026)</p>
+      <p>E-mail: hjs31001@korea.kr</p>
+      <p>v1.0</p>
     </div>
-    <div class="stage-card disabled">
-      <div class="stage-card-title">stage3: 에너지의 구역</div>
-      <span class="stage-card-pending">준비중</span>
-    </div>
-    <div class="stage-card disabled">
-      <div class="stage-card-title">stage4: 열의 구역</div>
-      <span class="stage-card-pending">준비중</span>
-    </div>
-    <div class="stage-card disabled">
-      <div class="stage-card-title">stage5: 전기의 구역</div>
-      <span class="stage-card-pending">준비중</span>
-    </div>
-    <div class="stage-card disabled">
-      <div class="stage-card-title">stage6: 자기의 구역</div>
-      <span class="stage-card-pending">준비중</span>
-    </div>
-    <div class="stage-card disabled">
-      <div class="stage-card-title">stage7: 빛의 구역</div>
-      <span class="stage-card-pending">준비중</span>
-    </div>
-    <div class="stage-card disabled">
-      <div class="stage-card-title">stage8: 원자의 구역</div>
-      <span class="stage-card-pending">준비중</span>
-    </div>
-  </div>
-  <div class="stage-select-footer">
-    <p>제작: 물리교사 한재상(경남교육청 과학교육원, 2026)</p>
-    <p>E-mail: hjs31001@korea.kr</p>
-    <p>v1.0</p>
   </div>
 </div>
 <div class="rotate-overlay" id="rotateOverlay">
