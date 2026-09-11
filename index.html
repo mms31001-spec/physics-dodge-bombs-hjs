@@ -116,19 +116,23 @@
     text-overflow:ellipsis;
   }
   .stage-card-btn, .stage-card-pending{
-    font-family:inherit; font-size:clamp(11px, 2.3vh, 16px); font-weight:600; border-radius:2px;
-    width:3vh; height:3vh; padding:0;
+    font-family:inherit; font-size:clamp(11px, 2.3vh, 16px); font-weight:600; border-radius:4px;
     display:flex; align-items:center; justify-content:center;
     box-sizing:border-box;
     flex:none;
+    white-space:nowrap;
   }
   .stage-card-btn{
+    padding:0.9vh 2vh;
+    min-width:3.8vh; min-height:3.8vh;
     cursor:pointer; border:1px solid #FFFFFF;
     background:#FFFFFF; color:#0A0A0A;
     -webkit-tap-highlight-color:transparent;
   }
   .stage-card-btn:active{ transform:scale(0.96); }
   .stage-card-pending{
+    padding:1vh 2vh;
+    min-height:4.2vh;
     border:1px solid rgba(242,237,224,0.4);
     background:transparent;
     color:rgba(242,237,224,0.6);
