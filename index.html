@@ -1,0 +1,2716 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>물리학으로 폭탄 피하기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Serif+KR:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F7F4EC;
+    --grid:#DDD6C3;
+    --grid-strong:#CFC6AE;
+    --ink:#242220;
+    --ink-soft:#6B6459;
+    --panel:#FFFFFF;
+    --panel-border:#E4DDC9;
+    --target:#1F8A6E;
+    --target-fill:rgba(31,138,110,0.14);
+    --success:#1F8A6E;
+    --fail:#A9433A;
+    --w1:#3B5BA9;
+    --w2:#B23A6E;
+    --w3:#3F7D5C;
+    --w4:#C08A1E;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Pretendard",sans-serif;
+    padding:28px 20px 60px;
+  }
+  .mono{font-family:"JetBrains Mono",ui-monospace,monospace;}
+  .wrap{max-width:980px;margin:0 auto;}
+
+  .splash{
+    position:fixed; inset:0;
+    background:#0A0A0A;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    z-index:1000;
+    transition:opacity 1s ease;
+  }
+  .splash.fade-out{opacity:0; pointer-events:none;}
+
+  .stage-select{
+    position:fixed; inset:0;
+    background:#0A0A0A;
+    display:none;
+    flex-direction:column; align-items:center; justify-content:center;
+    gap:26px;
+    z-index:999;
+    transition:opacity 1s ease;
+    padding:20px;
+    overflow-y:auto;
+  }
+  .stage-select.show{display:flex;}
+  .stage-select.fade-out{opacity:0; pointer-events:none;}
+  .stage-select-heading{
+    font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
+    font-size:30px; font-weight:700; color:#FFFFFF;
+    letter-spacing:0.1em;
+    text-align:center;
+    text-shadow:0 0 20px rgba(255,255,255,0.25);
+    margin-bottom:-10px;
+  }
+  .stage-select-title{
+    font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
+    font-size:20px; font-weight:600; color:#FFFFFF;
+    letter-spacing:0.14em;
+  }
+  .stage-select-grid{
+    display:grid;
+    grid-template-columns:repeat(4, 210px);
+    gap:18px; justify-content:center;
+    max-width:900px;
+  }
+  .stage-card{
+    width:210px;
+    min-height:150px;
+    box-sizing:border-box;
+    background:rgba(255,251,242,0.06);
+    border:1px solid rgba(255,255,255,0.25);
+    border-radius:4px;
+    padding:22px 14px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+  }
+  .stage-card.disabled{
+    opacity:0.45;
+  }
+  .stage-card-title{
+    font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
+    font-size:14px; color:#F2EDE0;
+    text-align:center;
+    letter-spacing:0.02em;
+    line-height:1.5;
+    white-space:nowrap;
+  }
+  .stage-card-btn{
+    font-family:inherit; font-size:13px; font-weight:600; border-radius:2px;
+    padding:8px 20px; cursor:pointer; border:1px solid #FFFFFF;
+    background:#FFFFFF; color:#0A0A0A;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .stage-card-btn:active{ transform:scale(0.96); }
+  .stage-card-pending{
+    font-family:inherit; font-size:13px; font-weight:600;
+    color:rgba(242,237,224,0.6);
+    letter-spacing:0.04em;
+  }
+  .stage-select-footer{
+    width:100%;
+    max-width:400px;
+    margin-top:6px;
+    padding-top:16px;
+    border-top:1px dashed rgba(255,255,255,0.25);
+    text-align:center;
+  }
+  .stage-select-footer p{
+    margin:0 0 4px;
+    font-size:11.5px;
+    color:rgba(242,237,224,0.55);
+    letter-spacing:0.02em;
+  }
+  .stage-select-footer p:last-child{ margin-bottom:0; }
+  .splash-tagline{
+    text-align:center;
+    padding:0 20px;
+    margin-bottom:16px;
+    font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
+    font-size:16px;
+    color:#E8E2D3;
+    letter-spacing:0.1em;
+  }
+  .splash-tagline span{
+    opacity:0;
+    transition:opacity 1s ease;
+  }
+  .splash-tagline span.show{opacity:1;}
+  .splash-title{
+    font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
+    font-size:30px; font-weight:600; color:#FFFFFF;
+    letter-spacing:0.22em;
+    opacity:0; transform:translateY(10px);
+    transition:opacity 1.3s ease, transform 1.3s ease;
+    text-shadow:0 0 22px rgba(255,255,255,0.3);
+    text-align:center;
+    padding:0 20px;
+  }
+  .splash-title.show{opacity:1; transform:translateY(0);}
+  .splash-sub{
+    font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
+    font-size:13px; color:#C9C2B0; letter-spacing:0.16em;
+    margin-top:16px;
+    opacity:0; transform:translateY(8px);
+    transition:opacity 1.3s ease, transform 1.3s ease;
+  }
+  .splash-sub.show{opacity:1; transform:translateY(0);}
+  .splash-version{
+    font-family:"JetBrains Mono",ui-monospace,monospace;
+    font-size:11px; color:#8A8272; letter-spacing:0.08em;
+    margin-top:6px;
+    opacity:0; transform:translateY(6px);
+    transition:opacity 1.3s ease, transform 1.3s ease;
+  }
+  .splash-version.show{opacity:1; transform:translateY(0);}
+  .splash-start-btn{
+    max-height:0; opacity:0; overflow:hidden;
+    margin-top:0;
+    padding:10px 28px;
+    border:1px solid transparent;
+    transition:max-height .6s ease, opacity .6s ease, margin-top .6s ease;
+    font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
+    font-size:15px; letter-spacing:0.12em;
+    color:#0A0A0A; background:#FFFFFF;
+    border-radius:2px; cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .splash-start-btn.show{
+    max-height:60px; opacity:1; margin-top:20px;
+    border-color:#fff;
+  }
+  .splash-start-btn:active{ transform:scale(0.96); }
+
+  .rotate-overlay{
+    position:fixed; inset:0;
+    background:#0A0A0A;
+    color:#fff;
+    display:none;
+    flex-direction:column;
+    align-items:center; justify-content:center;
+    gap:14px;
+    z-index:900;
+    text-align:center;
+    padding:20px;
+  }
+  .rotate-overlay.show{display:flex;}
+  .rotate-icon{
+    font-size:40px;
+    animation:rotate-hint 1.6s ease-in-out infinite;
+  }
+  .rotate-msg{
+    font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
+    font-size:16px;
+    letter-spacing:0.08em;
+    color:#F2EDE0;
+  }
+  @keyframes rotate-hint{
+    0%,100%{ transform:rotate(0deg); }
+    50%{ transform:rotate(-90deg); }
+  }
+
+  header{margin-bottom:22px;}
+  .eyebrow{font-size:13px;color:var(--ink-soft);margin:0 0 6px;}
+  h1{font-size:26px;font-weight:700;margin:0 0 10px;letter-spacing:-0.01em;}
+  .objective{font-size:14.5px;line-height:1.6;color:var(--ink-soft);max-width:580px;margin:0;}
+  .objective b{color:var(--ink);font-weight:600;}
+
+  .layout{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:20px;
+    margin-top:0;
+    align-items:start;
+  }
+
+  .stage{background:var(--panel);border:1px solid var(--panel-border);border-radius:3px;padding:14px;position:relative;}
+  .gameover-overlay{
+    position:absolute; inset:0;
+    display:none; align-items:center; justify-content:center;
+    flex-direction:column; gap:16px;
+    background:rgba(247,244,236,0.94);
+    border-radius:2px; z-index:10;
+  }
+  .gameover-overlay.show{display:flex;}
+  .gameover-title{
+    font-size:38px; font-weight:700; letter-spacing:0.02em;
+    color:#B23A2E;
+  }
+  .gameover-sub{font-size:13.5px; color:var(--ink-soft); max-width:340px; text-align:center; margin:-8px 0 0;}
+  .gameover-stats{
+    display:flex; flex-direction:column; gap:4px;
+    font-size:13px; color:var(--ink-soft);
+    text-align:center;
+    margin:-2px 0 0;
+  }
+  .gameover-stats b{color:var(--ink);}
+  .gameover-overlay button{
+    font-family:inherit; font-size:14px; font-weight:600; border-radius:2px;
+    padding:6px 16px; line-height:1.2; cursor:pointer; border:1px solid var(--ink);
+    background:var(--ink); color:var(--paper); flex:none; align-self:center;
+  }
+  .foul-overlay{
+    position:absolute; inset:0;
+    display:none; align-items:center; justify-content:center;
+    flex-direction:column; gap:10px;
+    background:rgba(247,244,236,0.94);
+    border-radius:2px; z-index:9;
+    padding:20px;
+  }
+  .foul-overlay.show{display:flex;}
+  .foul-title{
+    font-size:32px; font-weight:700; letter-spacing:0.06em;
+    color:#C08A1E;
+  }
+  .foul-sub{font-size:13px; color:var(--ink-soft); max-width:300px; text-align:center; margin:-2px 0 0;}
+  .foul-overlay button{
+    font-family:inherit; font-size:14px; font-weight:600; border-radius:2px;
+    padding:6px 16px; line-height:1.2; cursor:pointer; border:1px solid var(--ink);
+    background:var(--ink); color:var(--paper); flex:none; align-self:center;
+  }
+
+  .stage-clear-overlay{
+    position:absolute; inset:0;
+    display:none; align-items:center; justify-content:center;
+    flex-direction:column; gap:16px;
+    background:rgba(247,244,236,0.96);
+    border-radius:2px; z-index:11;
+    padding:20px;
+  }
+  .stage-clear-overlay.show{display:flex;}
+  .stage-clear-title{
+    font-size:26px; font-weight:700; letter-spacing:0.04em;
+    color:#1F8A6E; text-align:center;
+  }
+  .stage-clear-progress{
+    font-size:13px; color:var(--ink-soft);
+    text-align:center; margin:-8px 0 0;
+  }
+  .stage-clear-overlay button{
+    font-family:inherit; font-size:14px; font-weight:600; border-radius:2px;
+    padding:8px 20px; line-height:1.2; cursor:pointer; border:1px solid var(--ink);
+    background:var(--ink); color:var(--paper); flex:none; align-self:center;
+  }
+
+  .pill-icon{ position:relative; width:34px; height:15px; display:flex; }
+  .pill-icon .pill-half{ display:block; height:100%; }
+  .pill-icon .pill-half.left{ width:50%; background:#E85B5B; border-radius:7.5px 0 0 7.5px; }
+  .pill-icon .pill-half.right{ width:50%; background:#F5F1E6; border-radius:0 7.5px 7.5px 0; }
+  .pill-icon{ border-radius:7.5px; box-shadow:0 1px 4px rgba(0,0,0,0.25); overflow:hidden; }
+  .pill-icon.small{ width:26px; height:12px; }
+
+  .item-pickup-overlay{
+    position:absolute; inset:0;
+    display:none; align-items:center; justify-content:center;
+    flex-direction:column; gap:16px;
+    background:rgba(247,244,236,0.96);
+    border-radius:2px; z-index:13;
+    padding:20px;
+  }
+  .item-pickup-overlay.show{display:flex;}
+  .item-pickup-text{
+    font-size:16px; font-weight:600; letter-spacing:0.02em;
+    color:var(--ink); text-align:center;
+  }
+  .item-pickup-desc{
+    font-size:12.5px; color:var(--ink-soft);
+    text-align:center; margin:-6px 0 0;
+  }
+  .item-pickup-overlay button{
+    font-family:inherit; font-size:14px; font-weight:600; border-radius:2px;
+    padding:8px 22px; line-height:1.2; cursor:pointer; border:1px solid var(--ink);
+    background:var(--ink); color:var(--paper); flex:none;
+  }
+  .item-pickup-overlay button.secondary-btn{
+    background:transparent; color:var(--ink); border:1px solid var(--panel-border);
+  }
+  .confirm-btn-row{ display:flex; gap:10px; }
+
+  .sedative-btn{
+    position:absolute; top:100px; right:14px;
+    width:52px; height:38px;
+    border-radius:6px;
+    background:rgba(255,251,242,0.94);
+    border:1px solid var(--panel-border);
+    box-shadow:0 1px 6px rgba(0,0,0,0.1);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    z-index:7;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .sedative-btn:active{ transform:scale(0.94); }
+
+  .stage-banner{
+    position:absolute; inset:0;
+    display:none; align-items:center; justify-content:center;
+    background:transparent;
+    z-index:12;
+    pointer-events:none;
+    opacity:0;
+    transition:opacity .5s ease;
+  }
+  .stage-banner.show{display:flex; opacity:1;}
+  .stage-banner-text{
+    font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
+    font-size:22px; font-weight:600; color:#FFFFFF;
+    letter-spacing:0.12em;
+    text-align:center;
+    padding:14px 28px;
+    background:rgba(10,10,10,0.82);
+    border-radius:4px;
+    box-shadow:0 4px 18px rgba(0,0,0,0.25);
+    margin:0 20px;
+  }
+
+  canvas{width:100%;height:auto;display:block;border-radius:2px;}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:3px;
+    padding:18px 18px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+
+  .gauge{display:flex;flex-direction:column;gap:6px;padding:10px 11px;border-radius:2px;border:1px solid var(--panel-border);background:var(--paper);transition:border-color .15s ease, opacity .15s ease;}
+  .gauge.waiting{opacity:0.45;}
+  .gauge.active{border-color:var(--ink);}
+  .gauge.locked{border-color:var(--success);background:var(--target-fill);}
+  .gauge.stage-gauge{
+    position:absolute;
+    bottom:14px;
+    width:calc(50% - 64px);
+    max-width:360px;
+    background:rgba(255,251,242,0.94);
+    box-shadow:0 1px 6px rgba(0,0,0,0.08);
+    z-index:5;
+  }
+  .gauge.stage-gauge.pos-left{left:14px;}
+  .gauge.stage-gauge.pos-right{right:14px;}
+  .tap-btn{
+    position:absolute;
+    bottom:14px; left:50%;
+    transform:translateX(-50%);
+    width:90px; height:90px;
+    border-radius:50%;
+    background:var(--ink);
+    color:var(--paper);
+    border:4px solid var(--paper);
+    box-shadow:0 2px 10px rgba(0,0,0,0.28);
+    display:flex; align-items:center; justify-content:center;
+    font-family:"JetBrains Mono",monospace;
+    font-size:14px; font-weight:700; letter-spacing:0.03em;
+    cursor:pointer;
+    z-index:6;
+    user-select:none;
+    -webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;
+    transition:transform .08s ease, background .08s ease;
+  }
+  .tap-btn:active{
+    transform:translateX(-50%) scale(0.9);
+    background:#3a3733;
+  }
+  .top-right-group{
+    position:absolute; top:14px; right:14px;
+    display:flex; flex-direction:row; align-items:flex-start; gap:8px;
+    z-index:7;
+  }
+  .sound-btn{
+    width:36px; height:36px;
+    border-radius:2px;
+    background:rgba(255,251,242,0.92);
+    border:1px solid var(--panel-border);
+    box-shadow:0 1px 6px rgba(0,0,0,0.08);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    font-size:16px;
+    -webkit-tap-highlight-color:transparent;
+    flex:none;
+  }
+  .play-timer{
+    position:absolute; top:14px; left:50%;
+    transform:translateX(-50%);
+    background:rgba(255,251,242,0.92);
+    border:1px solid var(--panel-border);
+    border-radius:2px;
+    padding:6px 12px;
+    font-family:"JetBrains Mono",ui-monospace,monospace;
+    font-size:14px; font-weight:600;
+    color:var(--ink);
+    box-shadow:0 1px 6px rgba(0,0,0,0.08);
+    z-index:6;
+  }
+  .sedative-status{
+    position:absolute; top:52px; left:50%;
+    transform:translateX(-50%);
+    background:rgba(232,91,91,0.92);
+    border-radius:2px;
+    padding:4px 10px;
+    font-size:11.5px; font-weight:600;
+    color:#FFFFFF;
+    letter-spacing:0.03em;
+    box-shadow:0 1px 6px rgba(0,0,0,0.12);
+    z-index:6;
+    display:none;
+  }
+  .sedative-status.show{display:block;}
+  .mass-badge{
+    background:rgba(255,251,242,0.92);
+    border:1px solid var(--panel-border);
+    border-radius:2px;
+    padding:6px 10px;
+    font-size:12px;
+    color:var(--ink-soft);
+    box-shadow:0 1px 6px rgba(0,0,0,0.08);
+    text-align:left;
+    line-height:1.6;
+    flex:none;
+  }
+  .gauge-head{display:flex;justify-content:space-between;align-items:baseline;}
+  .gauge-label{font-size:13px;font-weight:600;}
+  .gauge-status{font-size:11px;color:var(--ink-soft);}
+  .gauge.locked .gauge-status{color:var(--success);font-weight:600;}
+  .gauge-track{position:relative;height:20px;background:#EFE9D8;border-radius:2px;overflow:hidden;}
+  .gauge-tick-line{position:absolute;top:0;bottom:0;width:1px;background:var(--ink-soft);}
+  .gauge-tick-line.minor{background:var(--grid-strong);opacity:1;width:1px;}
+  .gauge-marker{position:absolute;top:1px;bottom:1px;width:3px;background:var(--ink);border-radius:1px;transform:translateX(-50%);z-index:2;}
+  .gauge.locked .gauge-marker{background:var(--success);width:4px;}
+  .gauge-ticks{display:flex;justify-content:space-between;font-size:10px;color:var(--ink-soft);}
+  .gauge-current{font-size:12.5px;min-height:15px;}
+
+  .action-row{display:flex;gap:8px;margin-top:2px;}
+  button{
+    font-family:inherit;font-size:13.5px;font-weight:600;border-radius:2px;
+    padding:11px 14px;cursor:pointer;border:1px solid var(--ink);
+    background:var(--ink);color:var(--paper);flex:1;transition:opacity .15s ease;
+  }
+  button:disabled{opacity:0.35;cursor:default;}
+  button.secondary{background:transparent;color:var(--ink);border:1px solid var(--panel-border);}
+  .hint{font-size:11.5px;color:var(--ink-soft);text-align:center;margin:-4px 0 0;}
+  .hint kbd{font-family:"JetBrains Mono",monospace;background:var(--paper);border:1px solid var(--panel-border);border-radius:2px;padding:1px 5px;}
+
+  .stats{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-soft);}
+  .stats b{color:var(--ink);}
+
+  .result{
+    min-height:54px;font-size:13px;line-height:1.55;padding:10px 11px;border-radius:2px;
+    background:var(--paper);border:1px solid var(--panel-border);color:var(--ink-soft);
+  }
+  .result.success{border-color:var(--success);color:var(--ink);background:var(--target-fill);}
+  .result.fail{border-color:var(--fail);color:var(--ink);}
+  .result.explode{border-color:#B23A2E;color:#fff;background:#B23A2E;font-weight:600;}
+
+  .worlds-title{font-size:12px;color:var(--ink-soft);margin:2px 0 2px;}
+  .world-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
+  .world-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);}
+  .swatch{width:9px;height:9px;border-radius:50%;flex:none;}
+  .world-item.ok{color:var(--ink);}
+  .world-item .tag{font-size:10.5px;padding:1px 5px;border-radius:2px;margin-left:auto;}
+  .tag.ok{background:var(--target-fill);color:var(--success);}
+  .tag.no{background:#F1E4E2;color:var(--fail);}
+  @media (max-width:600px){
+    body{ padding:0; min-height:100vh; min-height:100dvh; display:flex; align-items:center; }
+    .wrap{ max-width:100%; width:100%; }
+    .layout{ gap:0; }
+    .stage{ padding:6px; border-radius:0; border-left:none; border-right:none; }
+    .splash-title{ font-size:22px; letter-spacing:0.14em; }
+    .splash-sub{ font-size:11.5px; letter-spacing:0.1em; }
+    .splash-tagline{ font-size:13px; }
+    .stage-select-grid{ grid-template-columns:repeat(2, minmax(130px, 1fr)); max-width:100%; }
+    .stage-card{ width:auto; }
+  }
+
+  @media (orientation:landscape) and (max-height:500px){
+    html, body{ height:100%; }
+    body{ padding:0; margin:0; display:flex; align-items:center; justify-content:center; }
+    .wrap{ max-width:none; width:auto; margin:0; }
+    .layout{ gap:0; justify-items:center; }
+    .stage{
+      width:min(100vw, calc(100vh * (720/420)));
+      aspect-ratio:720/420;
+      padding:0;
+      border:none;
+      border-radius:0;
+      margin:0 auto;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="splash" id="splash">
+  <div class="splash-tagline" id="splashTagline"><span id="taglinePart1">필요한 것은 물리학</span><span id="taglinePart2" class="tagline-part2">, 그리고 타이밍</span></div>
+  <div class="splash-title" id="splashTitle">물리학으로 폭탄 피하기</div>
+  <button type="button" class="splash-start-btn" id="startGameBtn">게임 시작</button>
+  <div class="splash-version" id="splashVersion">v1.0</div>
+</div>
+<div class="stage-select" id="stageSelect">
+  <div class="stage-select-heading">물리학으로 폭탄 피하기</div>
+  <div class="stage-select-title">스테이지 선택</div>
+  <div class="stage-select-grid">
+    <div class="stage-card">
+      <div class="stage-card-title">stage1: 운동의 구역</div>
+      <button type="button" class="stage-card-btn" data-stage="1">선택</button>
+    </div>
+    <div class="stage-card">
+      <div class="stage-card-title">stage2: 충격량의 구역</div>
+      <button type="button" class="stage-card-btn" data-stage="2">선택</button>
+    </div>
+    <div class="stage-card disabled">
+      <div class="stage-card-title">stage3: 에너지의 구역</div>
+      <span class="stage-card-pending">준비중</span>
+    </div>
+    <div class="stage-card disabled">
+      <div class="stage-card-title">stage4: 열의 구역</div>
+      <span class="stage-card-pending">준비중</span>
+    </div>
+    <div class="stage-card disabled">
+      <div class="stage-card-title">stage5: 전기의 구역</div>
+      <span class="stage-card-pending">준비중</span>
+    </div>
+    <div class="stage-card disabled">
+      <div class="stage-card-title">stage6: 자기의 구역</div>
+      <span class="stage-card-pending">준비중</span>
+    </div>
+    <div class="stage-card disabled">
+      <div class="stage-card-title">stage7: 빛의 구역</div>
+      <span class="stage-card-pending">준비중</span>
+    </div>
+    <div class="stage-card disabled">
+      <div class="stage-card-title">stage8: 원자의 구역</div>
+      <span class="stage-card-pending">준비중</span>
+    </div>
+  </div>
+  <div class="stage-select-footer">
+    <p>제작: 물리교사 한재상(경남교육청 과학교육원, 2026)</p>
+    <p>E-mail: hjs31001@korea.kr</p>
+    <p>v1.0</p>
+  </div>
+</div>
+<div class="rotate-overlay" id="rotateOverlay">
+  <div class="rotate-icon">📱</div>
+  <div class="rotate-msg">스마트폰을 가로로 돌려주세요</div>
+</div>
+<div class="wrap">
+  <div class="layout">
+    <div class="stage">
+      <canvas id="sim" width="720" height="420"></canvas>
+      <div class="gameover-overlay" id="gameoverOverlay">
+        <div class="gameover-title">게임 오버</div>
+        <p class="gameover-sub" id="gameoverReasonText"></p>
+        <div class="gameover-stats" id="gameoverStats">
+          <div>이동 거리: <b class="mono" id="gameoverDistance">0 m</b></div>
+          <div>소요 시간: <b class="mono" id="gameoverTime">00:00</b></div>
+        </div>
+        <button id="overlayRestartBtn">재도전</button>
+      </div>
+
+      <div class="foul-overlay" id="foulOverlay">
+        <div class="foul-title">파울</div>
+        <p class="foul-sub">발사가 너무 약해서 폭탄 구역까지 닿지 못했습니다.</p>
+        <button id="foulRetryBtn">다시 도전</button>
+      </div>
+
+      <div class="stage-clear-overlay" id="stageClearOverlay">
+        <div class="stage-clear-title" id="stageClearTitle">stage1: 운동의 구역 클리어</div>
+        <div class="stage-clear-progress" id="stageClearProgress">클리어한 스테이지: 1</div>
+        <div class="gameover-stats" id="stageClearStats">
+          <div>이동 거리: <b class="mono" id="stageClearDistance">0 m</b></div>
+          <div>소요 시간: <b class="mono" id="stageClearTime">00:00</b></div>
+        </div>
+        <button id="stageClearBtn">stage2로 가기</button>
+      </div>
+
+      <div class="item-pickup-overlay" id="itemPickupOverlay">
+        <div class="item-pickup-text">신경안정제를 획득하였습니다.</div>
+        <div class="pill-icon"><span class="pill-half left"></span><span class="pill-half right"></span></div>
+        <p class="item-pickup-desc">조준바의 속도를 50% 감소시킨다.</p>
+        <button id="itemPickupConfirmBtn">확인</button>
+      </div>
+
+      <button type="button" class="sedative-btn" id="sedativeBtn" style="display:none;" aria-label="신경안정제 사용">
+        <div class="pill-icon small"><span class="pill-half left"></span><span class="pill-half right"></span></div>
+      </button>
+
+      <div class="item-pickup-overlay" id="sedativeConfirmOverlay">
+        <div class="item-pickup-text">신경안정제를 사용하시겠습니까?</div>
+        <div class="confirm-btn-row">
+          <button id="sedativeUseBtn">사용</button>
+          <button id="sedativeCancelBtn" class="secondary-btn">취소</button>
+        </div>
+      </div>
+
+      <div class="stage-banner" id="stageBanner">
+        <div class="stage-banner-text" id="stageBannerText">stage1: 운동의 구역</div>
+      </div>
+
+      <div class="top-right-group">
+        <button type="button" class="sound-btn" id="soundBtn" aria-label="사운드">🔈</button>
+        <div class="mass-badge" id="massBadge">공의 질량=<b class="mono">2kg</b><br>중력가속도=<b class="mono">10m/s²</b><br>눈금 한 칸=<b class="mono">1m</b><br><span id="frictionLine" style="display:none;">충격력 작용 시간=<b class="mono">0.01s</b> (고정)</span></div>
+      </div>
+      <div class="play-timer"><span id="playTimer">00:00</span> · <span id="playDistance">0.0 m</span></div>
+      <div class="sedative-status" id="sedativeStatus">신경안정제 사용 중</div>
+
+      <div class="gauge active stage-gauge pos-left" id="gauge-v0">
+        <div class="gauge-head">
+          <span class="gauge-label" id="label-v0">초기속도 v0 (m/s)</span>
+          <span class="gauge-status" id="status-v0">조준 중</span>
+        </div>
+        <div class="gauge-track" id="track-v0"><div class="gauge-marker" id="marker-v0" style="left:0%"></div></div>
+        <div class="gauge-ticks mono" id="ticks-v0"></div>
+        <div class="gauge-current mono" id="value-v0">&nbsp;</div>
+      </div>
+
+      <div class="gauge waiting stage-gauge pos-right" id="gauge-force">
+        <div class="gauge-head">
+          <span class="gauge-label" id="label-force">마찰력 f (N)</span>
+          <span class="gauge-status" id="status-force">대기 중</span>
+        </div>
+        <div class="gauge-track" id="track-force"><div class="gauge-marker" id="marker-force" style="left:0%"></div></div>
+        <div class="gauge-ticks mono" id="ticks-force"></div>
+        <div class="gauge-current mono" id="value-force">&nbsp;</div>
+      </div>
+
+      <button type="button" class="tap-btn" id="tapLockBtn" aria-label="고정 (STOP)">STOP</button>
+    </div>
+
+    <div class="panel" style="display:none;">
+      <div class="action-row">
+        <button id="mainBtn">고정 (Space)</button>
+        <button id="resetBtn" class="secondary">전체 초기화</button>
+      </div>
+      <p class="hint">진행 중인 게이지에서 <kbd>Space</kbd>를 누르면 그 순간 값으로 고정됩니다</p>
+
+      <div class="stats">
+        <span>단계 <b class="mono" id="stageNum">1</b>/2</span>
+        <span>목표까지 거리 <b class="mono" id="holeDist">-</b> m</span>
+      </div>
+      <div class="stats">
+        <span>시도 <b class="mono" id="shotCount">0</b>타</span>
+        <span>기록된 세계 <b class="mono" id="worldCount">0</b>/4</span>
+      </div>
+
+      <div class="result" id="result">첫 번째 게이지가 움직이고 있어요. 스페이스바로 v0 값을 고정해보세요.</div>
+
+      <div>
+        <p class="worlds-title">시도 기록</p>
+        <ul class="world-list" id="worldList"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('sim');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const MARGIN = 50;
+  const USABLE = W - MARGIN*2;
+  const GROUND_HEIGHT_PX = (H/2) * (2/3);
+  const mainLaneY = H - GROUND_HEIGHT_PX;
+  const worldLaneYs = [180, 230, 280, 330];
+  const ballR = 8;
+  const MASS = 2; // kg, fixed ball mass
+  const GRAVITY_G = 10; // m/s^2
+  const NORMAL_FORCE = MASS * GRAVITY_G; // N — balances gravity, net vertical force = 0
+
+  // ---- World geometry (all in meters) ----
+  const ZONE_WIDTH_M = 2;
+  const ZONE1_CENTER_M = 10;
+  const ZONE1_LEFT_M = ZONE1_CENTER_M - ZONE_WIDTH_M/2;
+  const ZONE1_RIGHT_M = ZONE1_CENTER_M + ZONE_WIDTH_M/2;
+  const CENTER_GAP_M = 20; // center-to-center distance between zone1 and zone2
+  const ZONE2_CENTER_M = ZONE1_CENTER_M + CENTER_GAP_M;
+  const ZONE2_LEFT_M = ZONE2_CENTER_M - ZONE_WIDTH_M/2;
+  const ZONE2_RIGHT_M = ZONE2_CENTER_M + ZONE_WIDTH_M/2;
+  const GAP_M = ZONE2_LEFT_M - ZONE1_RIGHT_M; // edge-to-edge span the stage2 bombs fill
+  const CENTER_GAP2_M = 25; // center-to-center distance between zone2 and zone3
+  const ZONE3_CENTER_M = ZONE2_CENTER_M + CENTER_GAP2_M;
+  const ZONE3_LEFT_M = ZONE3_CENTER_M - ZONE_WIDTH_M/2;
+  const ZONE3_RIGHT_M = ZONE3_CENTER_M + ZONE_WIDTH_M/2;
+  const GAP2_M = ZONE3_LEFT_M - ZONE2_RIGHT_M; // edge-to-edge span the stage3 nukes fill
+  const BLAST_RADIUS_M = 1; // stage1 bomb thickness 2m -> 1m each side
+
+  const GLOBAL_VIEW_START_M = 0;
+  const GLOBAL_VIEW_SPAN_M = ZONE3_RIGHT_M + 2; // fallback span, used for out-of-bounds cutoff only
+
+  const STAGE1_VIEWS = {
+    1: { startM: 0, spanM: ZONE1_RIGHT_M + GAP_M/3 },
+    2: { startM: ZONE1_LEFT_M, spanM: ZONE2_RIGHT_M - ZONE1_LEFT_M },
+    3: { startM: ZONE2_LEFT_M, spanM: ZONE3_RIGHT_M - ZONE2_LEFT_M }
+  };
+
+  let bombOrigin = performance.now();
+  let introDone = false;
+  let gameStartTime = null;
+  let deathDistanceM = 0;
+  let distanceOffsetM = 0;
+  let lastSafeDistanceM = 0;
+  let clearedStages = [];
+  let sedativeCollected = false;
+  let sedativeUsed = false;
+  let gaugeSpeedMultiplier = 1;
+  let gamePausedForItem = false;
+  let deathElapsedMs = 0;
+
+  const STAGE1_ZONES = {
+    1: {
+      targetLeftM: ZONE1_LEFT_M,
+      targetRightM: ZONE1_RIGHT_M,
+      targetName: '안전지대 1',
+      hazard: {type:'sweep', startM:1, endM:ZONE1_LEFT_M, sweepSec:2, pauseSec:3}
+    },
+    2: {
+      targetLeftM: ZONE2_LEFT_M,
+      targetRightM: ZONE2_RIGHT_M,
+      targetName: '안전지대 2',
+      hazard: {type:'segments', baseM:ZONE1_RIGHT_M, segLenM:GAP_M/4, count:4, segDurationSec:0.5, pauseSec:3}
+    },
+    3: {
+      targetLeftM: ZONE3_LEFT_M,
+      targetRightM: ZONE3_RIGHT_M,
+      targetName: '안전지대 3',
+      hazard: {type:'nukes', baseM:ZONE2_RIGHT_M, segLenM:GAP2_M/5, count:5, segDurationSec:0.5, pauseSec:4.5},
+      isLast: true
+    }
+  };
+
+  // ---- Stage 2: 충격량의 구역 ----
+  const STAGE2_FORCE_TIME_S = 0.01; // fixed force-application time for stage 2
+  const S2_ZONE1_CENTER_M = 10;
+  const S2_ZONE1_LEFT_M = S2_ZONE1_CENTER_M - ZONE_WIDTH_M/2;
+  const S2_ZONE1_RIGHT_M = S2_ZONE1_CENTER_M + ZONE_WIDTH_M/2;
+  const S2_CENTER_GAP2_M = 15; // center-to-center distance, zone1 to zone2
+  const S2_ZONE2_CENTER_M = S2_ZONE1_CENTER_M + S2_CENTER_GAP2_M;
+  const S2_ZONE2_LEFT_M = S2_ZONE2_CENTER_M - ZONE_WIDTH_M/2;
+  const S2_ZONE2_RIGHT_M = S2_ZONE2_CENTER_M + ZONE_WIDTH_M/2;
+  const S2_GAP2_M = S2_ZONE2_LEFT_M - S2_ZONE1_RIGHT_M; // edge-to-edge span the missile strikes fill
+  const S2_CENTER_GAP3_M = 50; // center-to-center distance, zone2 to zone3
+  const S2_ZONE3_CENTER_M = S2_ZONE2_CENTER_M + S2_CENTER_GAP3_M;
+  const S2_ZONE3_LEFT_M = S2_ZONE3_CENTER_M - ZONE_WIDTH_M/2;
+  const S2_ZONE3_RIGHT_M = S2_ZONE3_CENTER_M + ZONE_WIDTH_M/2;
+  const S2_GAP3_M = S2_ZONE3_LEFT_M - S2_ZONE2_RIGHT_M; // edge-to-edge span the zone2-3 bombs fill
+  const SEDATIVE_M = (S2_ZONE1_RIGHT_M + S2_ZONE2_LEFT_M) / 2; // item location, midpoint of zone1-2 gap
+
+  const STAGE2_ZONES = {
+    1: {
+      targetLeftM: S2_ZONE1_LEFT_M,
+      targetRightM: S2_ZONE1_RIGHT_M,
+      targetName: '안전지대 1',
+      hazard: {type:'area', startM:1, endM:S2_ZONE1_LEFT_M, period:5, flashDur:0.4}
+    },
+    2: {
+      targetLeftM: S2_ZONE2_LEFT_M,
+      targetRightM: S2_ZONE2_RIGHT_M,
+      targetName: '안전지대 2',
+      hazard: {type:'missile', startM:S2_ZONE1_RIGHT_M, endM:S2_ZONE2_LEFT_M, activeDur:2, pauseSec:3.5, randomRangeFrac:1.0, count:8, missileDuration:0.9}
+    },
+    3: {
+      targetLeftM: S2_ZONE3_LEFT_M,
+      targetRightM: S2_ZONE3_RIGHT_M,
+      targetName: '안전지대 3',
+      hazard: {type:'area', startM:S2_ZONE2_RIGHT_M, endM:S2_ZONE3_LEFT_M, period:13, flashDur:0.4},
+      isLast: true
+    }
+  };
+  const STAGE2_VIEWS = {
+    1: { startM: 0, spanM: S2_ZONE1_RIGHT_M + S2_GAP2_M/3 },
+    2: { startM: S2_ZONE1_LEFT_M, spanM: (S2_ZONE2_RIGHT_M - S2_ZONE1_LEFT_M) + S2_GAP3_M/3 },
+    3: { startM: S2_ZONE2_LEFT_M, spanM: S2_ZONE3_RIGHT_M - S2_ZONE2_LEFT_M }
+  };
+
+  const QUANTITIES_STAGE1 = [
+    {key:'v0',    label:'초기속도 v0', min:0, max:20, step:5, decimals:1, speed:0.5, unit:'m/s'},
+    {key:'force', label:'마찰력 f',    min:0, max:20, step:5, decimals:1, speed:0.5, unit:'N'}
+  ];
+  const QUANTITIES_STAGE2 = [
+    {key:'v0',    label:'충격력 F', min:0, max:4000, step:1000, decimals:0, speed:0.5, unit:'N'},
+    {key:'force', label:'마찰력 f', min:0, max:20,   step:5,    decimals:1, speed:0.5, unit:'N'}
+  ];
+
+  let gameStage = 1;
+  let ACTIVE_ZONES = STAGE1_ZONES;
+  let ACTIVE_VIEWS = STAGE1_VIEWS;
+  let QUANTITIES = QUANTITIES_STAGE1;
+
+  let runs = [];
+  let worldSeq = 0;
+  let shotCount = 0;
+
+  // mode: 'aiming' | 'flying' | 'resting' | 'gameover' | 'win'
+  let mode = 'aiming';
+  let gameOverReason = null;
+  let explosionStart = 0;
+  const EXPLOSION_DURATION = 550;
+  let stage = 1;
+  let legStartM = 0;      // where this leg's shots originate from
+  let ballM = 0;           // current ball position, meters
+  let phaseIndex = 0;
+  let fraction = 0;
+  let dir = 1;
+  let captured = {};
+  let flightV = 0;
+  let flightDecel = 0;
+  const WORLD_COLORS = ['#3B5BA9','#B23A6E','#3F7D5C','#C08A1E'];
+  const MAX_WORLDS = 4;
+  let currentColor = '#3B5BA9';
+
+  let lastFrameTime = null;
+  let hazardSoundState = {};
+
+  const mainBtn = document.getElementById('mainBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const playTimerEl = document.getElementById('playTimer');
+  const playDistanceEl = document.getElementById('playDistance');
+  const frictionLineEl = document.getElementById('frictionLine');
+  function formatTime(ms){
+    const totalSec = Math.max(0, Math.floor(ms/1000));
+    const mm = Math.floor(totalSec/60);
+    const ss = totalSec % 60;
+    return String(mm).padStart(2,'0') + ':' + String(ss).padStart(2,'0');
+  }
+  const gameoverOverlay = document.getElementById('gameoverOverlay');
+  const gameoverReasonText = document.getElementById('gameoverReasonText');
+  const gameoverDistanceEl = document.getElementById('gameoverDistance');
+  const gameoverTimeEl = document.getElementById('gameoverTime');
+  const overlayRestartBtn = document.getElementById('overlayRestartBtn');
+  overlayRestartBtn.addEventListener('click', ()=>{ returnToStageSelect(); });
+
+  function showGameOverOverlay(reasonText){
+    gameoverReasonText.textContent = reasonText;
+    gameoverOverlay.classList.add('show');
+  }
+  function hideGameOverOverlay(){
+    gameoverOverlay.classList.remove('show');
+  }
+
+  const foulOverlay = document.getElementById('foulOverlay');
+  const foulRetryBtn = document.getElementById('foulRetryBtn');
+  function showFoulOverlay(){ foulOverlay.classList.add('show'); }
+  function hideFoulOverlay(){ foulOverlay.classList.remove('show'); }
+  foulRetryBtn.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    hideFoulOverlay();
+    startNewShot();
+  });
+
+  const itemPickupOverlay = document.getElementById('itemPickupOverlay');
+  const itemPickupConfirmBtn = document.getElementById('itemPickupConfirmBtn');
+  const sedativeBtn = document.getElementById('sedativeBtn');
+  const sedativeStatusEl = document.getElementById('sedativeStatus');
+  const sedativeConfirmOverlay = document.getElementById('sedativeConfirmOverlay');
+  const sedativeUseBtn = document.getElementById('sedativeUseBtn');
+  const sedativeCancelBtn = document.getElementById('sedativeCancelBtn');
+
+  let itemPauseStartTime = null;
+  function pauseForItem(){
+    gamePausedForItem = true;
+    itemPauseStartTime = performance.now();
+  }
+  function resumeFromItemPause(){
+    if(itemPauseStartTime !== null){
+      const pausedDuration = performance.now() - itemPauseStartTime;
+      bombOrigin += pausedDuration;
+      itemPauseStartTime = null;
+    }
+    gamePausedForItem = false;
+  }
+
+  function collectSedative(){
+    sedativeCollected = true;
+    pauseForItem();
+    itemPickupOverlay.classList.add('show');
+  }
+  itemPickupConfirmBtn.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    itemPickupOverlay.classList.remove('show');
+    resumeFromItemPause();
+    if(!sedativeUsed) sedativeBtn.style.display = 'flex';
+  });
+
+  sedativeBtn.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    pauseForItem();
+    sedativeConfirmOverlay.classList.add('show');
+  });
+  sedativeUseBtn.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    gaugeSpeedMultiplier = 0.5;
+    sedativeUsed = true;
+    sedativeBtn.style.display = 'none';
+    sedativeConfirmOverlay.classList.remove('show');
+    resumeFromItemPause();
+    sedativeStatusEl.classList.add('show');
+  });
+  sedativeCancelBtn.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    sedativeConfirmOverlay.classList.remove('show');
+    resumeFromItemPause();
+  });
+
+  const stageBannerEl = document.getElementById('stageBanner');
+  const stageBannerTextEl = document.getElementById('stageBannerText');
+  let stageBannerTimer = null;
+  function showStageBanner(text){
+    stageBannerTextEl.textContent = text;
+    stageBannerEl.classList.add('show');
+    clearTimeout(stageBannerTimer);
+    stageBannerTimer = setTimeout(()=>{ stageBannerEl.classList.remove('show'); }, 3000);
+  }
+
+  const stageClearOverlay = document.getElementById('stageClearOverlay');
+  const stageClearTitleEl = document.getElementById('stageClearTitle');
+  const stageClearBtn = document.getElementById('stageClearBtn');
+  const stageClearProgressEl = document.getElementById('stageClearProgress');
+  const stageClearDistanceEl = document.getElementById('stageClearDistance');
+  const stageClearTimeEl = document.getElementById('stageClearTime');
+  function showStageClearOverlay(titleText, btnText, onClick){
+    stageClearTitleEl.textContent = titleText;
+    stageClearProgressEl.textContent = '클리어한 스테이지: ' + clearedStages.join(', ');
+    stageClearBtn.textContent = btnText;
+    stageClearBtn.onclick = (e)=>{ e.preventDefault(); e.stopPropagation(); onClick(); };
+    stageClearDistanceEl.textContent = (distanceOffsetM + ballM).toFixed(1) + ' m';
+    stageClearTimeEl.textContent = formatTime(gameStartTime !== null ? (performance.now()-gameStartTime) : 0);
+    stageClearOverlay.classList.add('show');
+  }
+  function hideStageClearOverlay(){
+    stageClearOverlay.classList.remove('show');
+  }
+
+  const resultEl = document.getElementById('result');
+  const worldListEl = document.getElementById('worldList');
+  const worldCountEl = document.getElementById('worldCount');
+  const shotCountEl = document.getElementById('shotCount');
+  const holeDistEl = document.getElementById('holeDist');
+  const stageNumEl = document.getElementById('stageNum');
+
+  function currentStageCfg(){ return ACTIVE_ZONES[stage]; }
+  function currentHazardStartM(){
+    const hz = currentStageCfg().hazard;
+    return (hz.type === 'sweep' || hz.type === 'area' || hz.type === 'missile') ? hz.startM : hz.baseM;
+  }
+
+  function updateDistanceDisplay(){
+    const cfg = currentStageCfg();
+    const targetCenterM = (cfg.targetLeftM+cfg.targetRightM)/2;
+    holeDistEl.textContent = (targetCenterM - legStartM).toFixed(1);
+    stageNumEl.textContent = stage;
+  }
+
+  function currentSpanM(){
+    return ACTIVE_VIEWS[stage].spanM;
+  }
+  function currentViewStartM(){
+    const span = currentSpanM();
+    if(mode !== 'aiming'){
+      return ballM - span/2;
+    }
+    return ACTIVE_VIEWS[stage].startM;
+  }
+  function mToPx(m){
+    return MARGIN + (m - currentViewStartM()) * (USABLE / currentSpanM());
+  }
+  function scalePx(){
+    return USABLE / currentSpanM();
+  }
+
+  function gaugeEls(key){
+    return {
+      wrap: document.getElementById('gauge-'+key),
+      marker: document.getElementById('marker-'+key),
+      status: document.getElementById('status-'+key),
+      value: document.getElementById('value-'+key)
+    };
+  }
+
+  function formatVal(q, v){ return v.toFixed(q.decimals) + (q.unit?(' '+q.unit):''); }
+
+  function buildTicks(){
+    QUANTITIES.forEach(q=>{
+      const track = document.getElementById('track-'+q.key);
+      const ticksRow = document.getElementById('ticks-'+q.key);
+      const marker = document.getElementById('marker-'+q.key);
+      track.querySelectorAll('.gauge-tick-line').forEach(el=>el.remove());
+      ticksRow.innerHTML = '';
+      for(let t=q.min; t<=q.max+1e-6; t+=q.step){
+        const frac = (t-q.min)/(q.max-q.min);
+        const line = document.createElement('div');
+        line.className = 'gauge-tick-line';
+        line.style.left = (frac*100)+'%';
+        track.insertBefore(line, marker);
+        const label = document.createElement('span');
+        label.textContent = t;
+        ticksRow.appendChild(label);
+
+        if(t + q.step <= q.max + 1e-6){
+          for(let k=1; k<=4; k++){
+            const subT = t + q.step*(k/5);
+            const subFrac = (subT-q.min)/(q.max-q.min);
+            const minorLine = document.createElement('div');
+            minorLine.className = 'gauge-tick-line minor';
+            minorLine.style.left = (subFrac*100)+'%';
+            track.insertBefore(minorLine, marker);
+          }
+        }
+      }
+    });
+  }
+  function rebuildTicks(){ buildTicks(); }
+  function updateGaugeLabelsForStage(){
+    const labelV0 = document.getElementById('label-v0');
+    const labelForce = document.getElementById('label-force');
+    const qv0 = QUANTITIES[0], qforce = QUANTITIES[1];
+    labelV0.textContent = qv0.label + ' (' + qv0.unit + ')';
+    labelForce.textContent = qforce.label + ' (' + qforce.unit + ')';
+  }
+
+  function renderGaugeState(){
+    QUANTITIES.forEach((q, i)=>{
+      const els = gaugeEls(q.key);
+      els.wrap.classList.remove('waiting','active','locked');
+      if(i < phaseIndex){
+        els.wrap.classList.add('locked');
+        els.status.textContent = '고정됨';
+        const v = captured[q.key];
+        const frac = (v - q.min)/(q.max-q.min);
+        els.marker.style.left = (frac*100)+'%';
+        els.value.textContent = formatVal(q, v);
+      } else if(i === phaseIndex && mode === 'aiming'){
+        els.wrap.classList.add('active');
+        els.status.textContent = '조준 중';
+        els.value.textContent = '\u00A0';
+      } else {
+        els.wrap.classList.add('waiting');
+        els.status.textContent = '대기 중';
+        els.marker.style.left = '0%';
+        els.value.textContent = '\u00A0';
+      }
+    });
+  }
+
+  function lockCurrentGauge(){
+    if(!introDone) return;
+    if(isPortrait()) return;
+    if(mode !== 'aiming' || phaseIndex >= QUANTITIES.length) return;
+    const q = QUANTITIES[phaseIndex];
+    const value = q.min + fraction*(q.max-q.min);
+    captured[q.key] = value;
+    playDing();
+    phaseIndex++;
+    fraction = 0;
+    dir = 1;
+
+    if(phaseIndex >= QUANTITIES.length){
+      renderGaugeState();
+      mainBtn.disabled = true;
+      mainBtn.textContent = '샷 진행 중…';
+      resultEl.className = 'result';
+      if(gameStage === 2){
+        const F = captured.v0, friction = captured.force;
+        flightV = (F * STAGE2_FORCE_TIME_S) / MASS;
+        flightDecel = friction / MASS;
+        resultEl.textContent = 'F '+F.toFixed(0)+' N · f '+friction.toFixed(1)+' N — 퍼팅 중…';
+      } else {
+        resultEl.textContent = 'v0 '+captured.v0.toFixed(1)+' m/s · f '+captured.force.toFixed(1)+' N — 퍼팅 중…';
+        flightV = captured.v0;
+        flightDecel = captured.force / MASS;
+      }
+      ballM = legStartM;
+      mode = 'flying';
+    } else {
+      renderGaugeState();
+    }
+  }
+
+  document.addEventListener('keydown', (e)=>{
+    if(e.code === 'Space'){
+      e.preventDefault();
+      if(e.repeat) return;
+      lockCurrentGauge();
+    }
+  });
+  mainBtn.addEventListener('click', ()=>{ lockCurrentGauge(); });
+
+  const tapLockBtn = document.getElementById('tapLockBtn');
+  let tapLockHandled = false;
+  tapLockBtn.addEventListener('pointerdown', (e)=>{
+    e.preventDefault();
+    tapLockHandled = true;
+    lockCurrentGauge();
+  });
+  tapLockBtn.addEventListener('click', (e)=>{
+    e.preventDefault();
+    if(tapLockHandled){ tapLockHandled = false; return; }
+    lockCurrentGauge();
+  });
+
+  // ---- Background music (procedural, plain Web Audio API — no external library) ----
+  const soundBtn = document.getElementById('soundBtn');
+  let musicStarted = false;
+  let soundOn = true;
+  let audioCtx = null;
+  let masterGain = null;
+  let musicTimerId = null;
+  soundBtn.textContent = '🔊';
+
+  const NOTE_FREQ = {
+    C2:65.41, F2:87.31, G2:98.00, A2:110.00,
+    F3:174.61, G3:196.00, A3:220.00, B3:246.94,
+    C4:261.63, D4:293.66, E4:329.63, F4:349.23, G4:392.00, A4:440.00,
+    C5:523.25
+  };
+
+  function getAudioCtx(){
+    if(!audioCtx){
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new Ctx();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = soundOn ? 0.16 : 0;
+
+      // Route through an <audio> element via MediaStream instead of
+      // connecting straight to ctx.destination. On iOS, raw Web Audio
+      // output is silenced by the physical mute switch, but audio played
+      // through an <audio>/<video> element ignores the mute switch (the
+      // same reason YouTube/Music still play with the switch flipped).
+      if(audioCtx.createMediaStreamDestination){
+        try{
+          const streamDest = audioCtx.createMediaStreamDestination();
+          masterGain.connect(streamDest);
+          const audioEl = document.createElement('audio');
+          audioEl.srcObject = streamDest.stream;
+          audioEl.setAttribute('playsinline','');
+          audioEl.autoplay = true;
+          audioEl.style.display = 'none';
+          document.body.appendChild(audioEl);
+          const p = audioEl.play();
+          if(p && p.catch) p.catch(()=>{});
+          window.__bgMusicAudioEl = audioEl; // keep a reference alive
+        }catch(err){
+          masterGain.connect(audioCtx.destination);
+        }
+      } else {
+        masterGain.connect(audioCtx.destination);
+      }
+    }
+    return audioCtx;
+  }
+
+  function playNote(noteName, duration, type, peakGain){
+    if(!audioCtx || !masterGain) return;
+    const freq = NOTE_FREQ[noteName];
+    if(!freq) return;
+    const t0 = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(peakGain, t0 + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.05);
+  }
+
+  function playDing(){
+    if(!audioCtx || !masterGain) return;
+    const t0 = audioCtx.currentTime;
+    // bright bell-like "ding": fundamental + a soft higher harmonic
+    [[1568, 0.5, 0.35], [2093, 0.22, 0.28]].forEach(([freq, peak, dur])=>{
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(peak, t0 + 0.006);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.05);
+    });
+  }
+
+  function playExplosionSound(){
+    if(!audioCtx || !masterGain) return;
+    const t0 = audioCtx.currentTime;
+
+    // low descending "thump"
+    const osc = audioCtx.createOscillator();
+    const oscGain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(170, t0);
+    osc.frequency.exponentialRampToValueAtTime(40, t0 + 0.25);
+    oscGain.gain.setValueAtTime(0.0001, t0);
+    oscGain.gain.exponentialRampToValueAtTime(0.55, t0 + 0.01);
+    oscGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
+    osc.connect(oscGain);
+    oscGain.connect(masterGain);
+    osc.start(t0);
+    osc.stop(t0 + 0.4);
+
+    // noisy "crack" burst, low-passed for a duller boom
+    const dur = 0.3;
+    const bufferSize = Math.max(1, Math.floor(audioCtx.sampleRate * dur));
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<bufferSize;i++){
+      data[i] = (Math.random()*2-1) * (1 - i/bufferSize);
+    }
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    const noiseFilter = audioCtx.createBiquadFilter();
+    noiseFilter.type = 'lowpass';
+    noiseFilter.frequency.value = 1100;
+    const noiseGain = audioCtx.createGain();
+    noiseGain.gain.setValueAtTime(0.4, t0);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(masterGain);
+    noise.start(t0);
+  }
+
+  function playNukeExplosionSound(){
+    if(!audioCtx || !masterGain) return;
+    const t0 = audioCtx.currentTime;
+
+    // deep, louder descending "boom" — bigger than the regular bomb thump
+    const osc = audioCtx.createOscillator();
+    const oscGain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(130, t0);
+    osc.frequency.exponentialRampToValueAtTime(28, t0 + 0.4);
+    oscGain.gain.setValueAtTime(0.0001, t0);
+    oscGain.gain.exponentialRampToValueAtTime(0.95, t0 + 0.012);
+    oscGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.6);
+    osc.connect(oscGain);
+    oscGain.connect(masterGain);
+    osc.start(t0);
+    osc.stop(t0 + 0.65);
+
+    // bigger, longer noise burst
+    const dur = 0.55;
+    const bufferSize = Math.max(1, Math.floor(audioCtx.sampleRate * dur));
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<bufferSize;i++){
+      data[i] = (Math.random()*2-1) * (1 - i/bufferSize);
+    }
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    const noiseFilter = audioCtx.createBiquadFilter();
+    noiseFilter.type = 'lowpass';
+    noiseFilter.frequency.value = 900;
+    const noiseGain = audioCtx.createGain();
+    noiseGain.gain.setValueAtTime(0.75, t0);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(masterGain);
+    noise.start(t0);
+  }
+
+  const BG_BPM = 122;
+  const BG_EIGHTH = 60 / BG_BPM / 2; // seconds per 8th note
+  // bright, uplifting C major progression: C - G - Am - F (root notes drive bass + arp)
+  const BG_ARP_NOTES = ['C4','E4','G4','C5','G4','E4','B3','D4','G4','G4','G4','D4','A3','C4','E4','A4','E4','C4','F3','A3','C4','F4','C4','A3'];
+  const BG_BASS_NOTES = ['C2','C2','G2','G2','A2','A2','F2','F2'];
+  let bgStep = 0;
+  let bgLoopRunning = false;
+
+  function bgTick(){
+    const arpNote = BG_ARP_NOTES[bgStep % BG_ARP_NOTES.length];
+    playNote(arpNote, BG_EIGHTH * 0.95, 'triangle', 0.5);
+    if(bgStep % 4 === 0){
+      const bassNote = BG_BASS_NOTES[Math.floor(bgStep/4) % BG_BASS_NOTES.length];
+      playNote(bassNote, BG_EIGHTH * 4 * 0.9, 'sine', 0.7);
+    }
+    bgStep++;
+    musicTimerId = setTimeout(bgTick, BG_EIGHTH * 1000);
+  }
+
+  function startBgLoop(){
+    if(bgLoopRunning) return;
+    bgLoopRunning = true;
+    bgTick();
+  }
+
+  function stopBgLoop(){
+    bgLoopRunning = false;
+    if(musicTimerId){ clearTimeout(musicTimerId); musicTimerId = null; }
+  }
+
+  function playGameOverSting(){
+    // short, dramatic descending minor phrase
+    const notes = [
+      {n:'A3', d:0.28, t:'sawtooth', g:0.55},
+      {n:'F3', d:0.28, t:'sawtooth', g:0.5},
+      {n:'C2', d:0.5,  t:'sawtooth', g:0.5}
+    ];
+    let delay = 0;
+    notes.forEach((note)=>{
+      setTimeout(()=>{ playNote(note.n, note.d, note.t, note.g); }, delay*1000);
+      delay += note.d * 0.85;
+    });
+  }
+
+  function initMusic(){
+    if(musicStarted) return;
+    musicStarted = true;
+    getAudioCtx();
+    startBgLoop();
+  }
+
+  function setMuted(muted){
+    if(masterGain) masterGain.gain.value = muted ? 0 : 0.16;
+  }
+
+  function tryStartAudio(){
+    const ctx = getAudioCtx();
+    if(ctx.state !== 'running' && ctx.resume){ ctx.resume(); }
+    if(!musicStarted) initMusic();
+    setMuted(!soundOn);
+  }
+  ['pointerdown','touchstart','touchend','keydown','click'].forEach((evt)=>{
+    document.addEventListener(evt, tryStartAudio, {once:true});
+  });
+
+  soundBtn.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    soundOn = !soundOn;
+    soundBtn.textContent = soundOn ? '🔊' : '🔈';
+    tryStartAudio();
+    setMuted(!soundOn);
+  });
+
+  function startNewShot(){
+    phaseIndex = 0;
+    fraction = 0;
+    dir = 1;
+    captured = {};
+    ballM = legStartM;
+    flightV = 0;
+    flightDecel = 0;
+    mode = 'aiming';
+    gameOverReason = null;
+    gaugeSpeedMultiplier = 1;
+    sedativeStatusEl.classList.remove('show');
+    hideFoulOverlay();
+    mainBtn.disabled = false;
+    mainBtn.textContent = '고정 (Space)';
+    mainBtn.onclick = null;
+    resultEl.className = 'result';
+    resultEl.textContent = '새 샷 준비 완료. 스페이스바로 v0 값을 고정해보세요.';
+    updateDistanceDisplay();
+    renderGaugeState();
+  }
+
+  function startZone2(){
+    stage = 2;
+    legStartM = ballM;
+    startNewShot();
+    resultEl.textContent = '안전지대 1 통과! 이어서 안전지대 2로 — 스페이스바로 v0 값을 고정해보세요.';
+  }
+
+  function startZone3(){
+    stage = 3;
+    legStartM = ballM;
+    startNewShot();
+    resultEl.textContent = '안전지대 2 통과! 이어서 안전지대 3으로 — 스페이스바로 v0 값을 고정해보세요.';
+  }
+
+  function startS2Zone2(){
+    stage = 2;
+    legStartM = ballM;
+    startNewShot();
+    resultEl.textContent = '안전지대 1 통과! 이어서 안전지대 2로 — 스페이스바로 충격력 값을 고정해보세요.';
+  }
+
+  function startS2Zone3(){
+    stage = 3;
+    legStartM = ballM;
+    startNewShot();
+    resultEl.textContent = '안전지대 2 통과! 이어서 안전지대 3으로 — 스페이스바로 충격력 값을 고정해보세요.';
+  }
+
+  function startGameStage2(){
+    distanceOffsetM += ballM;
+    gameStage = 2;
+    ACTIVE_ZONES = STAGE2_ZONES;
+    ACTIVE_VIEWS = STAGE2_VIEWS;
+    QUANTITIES = QUANTITIES_STAGE2;
+    stage = 1;
+    legStartM = 0;
+    ballM = 0;
+    bombOrigin = performance.now();
+    hazardSoundState = {};
+    updateGaugeLabelsForStage();
+    rebuildTicks();
+    startNewShot();
+    hideStageClearOverlay();
+    showStageBanner('stage2: 충격량의 구역');
+    frictionLineEl.style.display = 'inline';
+  }
+
+  function fullReset(){
+    runs = [];
+    worldSeq = 0;
+    shotCount = 0;
+    stage = 1;
+    legStartM = 0;
+    ballM = 0;
+    distanceOffsetM = 0;
+    lastSafeDistanceM = 0;
+    clearedStages = [];
+    sedativeCollected = false;
+    sedativeUsed = false;
+    gaugeSpeedMultiplier = 1;
+    gamePausedForItem = false;
+    if(sedativeBtn) sedativeBtn.style.display = 'none';
+    if(sedativeStatusEl) sedativeStatusEl.classList.remove('show');
+    gameStage = 1;
+    ACTIVE_ZONES = STAGE1_ZONES;
+    ACTIVE_VIEWS = STAGE1_VIEWS;
+    QUANTITIES = QUANTITIES_STAGE1;
+    updateGaugeLabelsForStage();
+    rebuildTicks();
+    hazardSoundState = {};
+    frictionLineEl.style.display = 'none';
+    shotCountEl.textContent = shotCount;
+    renderWorldList();
+    hideGameOverOverlay();
+    hideStageClearOverlay();
+    startNewShot();
+    if(musicStarted) startBgLoop();
+    gameStartTime = performance.now();
+    bombOrigin = performance.now();
+    showStageBanner('stage1: 운동의 구역');
+  }
+  resetBtn.addEventListener('click', fullReset);
+
+  function evalHazard(hz, now){
+    if(hz.type === 'sweep'){
+      const cycle = hz.sweepSec + hz.pauseSec;
+      const elapsed = ((now - bombOrigin)/1000) % cycle;
+      if(elapsed < hz.sweepSec){
+        const frac = elapsed / hz.sweepSec;
+        return {type:'sweep', active:true, frontM: hz.startM + (hz.endM-hz.startM)*frac, hz};
+      }
+      return {type:'sweep', active:false, hz};
+    } else if(hz.type === 'nukes'){
+      const activeTotal = hz.count * hz.segDurationSec;
+      const cycle = activeTotal + hz.pauseSec;
+      const elapsed = ((now - bombOrigin)/1000) % cycle;
+      if(elapsed < activeTotal){
+        const timeIdx = Math.min(hz.count-1, Math.floor(elapsed / hz.segDurationSec));
+        const idx = (hz.count-1) - timeIdx; // right-to-left: last spatial segment explodes first
+        const segStartM = hz.baseM + idx*hz.segLenM;
+        const segEndM = segStartM + hz.segLenM;
+        const segProgress = (elapsed - timeIdx*hz.segDurationSec) / hz.segDurationSec;
+        return {type:'nukes', active:true, idx, segStartM, segEndM, segProgress, hz};
+      }
+      return {type:'nukes', active:false, hz};
+    } else if(hz.type === 'area'){
+      const elapsed = ((now - bombOrigin)/1000) % hz.period;
+      if(elapsed < hz.flashDur){
+        return {type:'area', active:true, progress: elapsed/hz.flashDur, hz};
+      }
+      return {type:'area', active:false, hz};
+    } else if(hz.type === 'missile'){
+      const cycle = hz.activeDur + hz.pauseSec;
+      const totalElapsed = (now - bombOrigin)/1000;
+      const cycleIndex = Math.floor(totalElapsed / cycle);
+      const elapsed = totalElapsed - cycleIndex*cycle;
+      if(elapsed < hz.activeDur){
+        const marginFrac = (1 - hz.randomRangeFrac)/2;
+        const rangeStart = hz.startM + (hz.endM-hz.startM)*marginFrac;
+        const rangeLen = (hz.endM-hz.startM)*hz.randomRangeFrac;
+        const launchWindow = Math.max(0, hz.activeDur - hz.missileDuration);
+        const missiles = [];
+        for(let i=0;i<hz.count;i++){
+          const launchOffset = hz.count > 1 ? (launchWindow*i/(hz.count-1)) : 0;
+          const localElapsed = elapsed - launchOffset;
+          if(localElapsed >= 0 && localElapsed < hz.missileDuration){
+            const rnd = pseudoRand(cycleIndex*97.7 + i*13.37 + 4.2);
+            const impactM = rangeStart + rnd*rangeLen;
+            const progress = localElapsed / hz.missileDuration;
+            missiles.push({impactM, progress, idx:i});
+          }
+        }
+        return {type:'missile', active: missiles.length > 0, missiles, hz};
+      }
+      return {type:'missile', active:false, missiles:[], hz};
+    } else {
+      const activeTotal = hz.count * hz.segDurationSec;
+      const cycle = activeTotal + hz.pauseSec;
+      const elapsed = ((now - bombOrigin)/1000) % cycle;
+      if(elapsed < activeTotal){
+        const idx = Math.min(hz.count-1, Math.floor(elapsed / hz.segDurationSec));
+        const segStartM = hz.baseM + idx*hz.segLenM;
+        const segEndM = segStartM + hz.segLenM;
+        return {type:'segments', active:true, idx, segStartM, segEndM, hz};
+      }
+      return {type:'segments', active:false, hz};
+    }
+  }
+
+  function getBombState(now){
+    const result = {};
+    Object.keys(ACTIVE_ZONES).forEach((key)=>{
+      result[key] = evalHazard(ACTIVE_ZONES[key].hazard, now);
+    });
+    return result;
+  }
+
+  const MISSILE_FALL_FRAC = 0.6; // fraction of activeDur spent falling before impact
+  const MISSILE_BLAST_RADIUS_M = 1.5;
+
+  function isBombHit(bomb){
+    if(bomb.active){
+      if(bomb.type === 'sweep'){
+        return ballM >= bomb.hz.startM && ballM <= bomb.hz.endM && Math.abs(ballM - bomb.frontM) <= BLAST_RADIUS_M;
+      }
+      if(bomb.type === 'area'){
+        return ballM >= bomb.hz.startM && ballM <= bomb.hz.endM;
+      }
+      if(bomb.type === 'missile'){
+        return bomb.missiles.some((m)=> m.progress >= MISSILE_FALL_FRAC && Math.abs(ballM - m.impactM) <= MISSILE_BLAST_RADIUS_M);
+      }
+      return ballM >= bomb.segStartM && ballM < bomb.segEndM;
+    }
+    return false;
+  }
+
+  function isHazardHit(bombState){
+    return Object.keys(bombState).some((key)=> isBombHit(bombState[key]));
+  }
+
+  function drawGrid(){
+    ctx.fillStyle = '#F7F4EC';
+    ctx.fillRect(0,0,W,mainLaneY);
+    ctx.fillStyle = '#8A6B4A';
+    ctx.fillRect(0,mainLaneY,W,H-mainLaneY);
+
+    ctx.strokeStyle = '#DDD6C3';
+    ctx.lineWidth = 1;
+
+    const step = scalePx(); // 1 meter per grid cell
+    const viewStart = currentViewStartM();
+    const firstM = Math.floor(viewStart - MARGIN/step);
+    const lastM = Math.ceil(viewStart + (W-MARGIN)/step) + 1;
+    for(let m=firstM; m<=lastM; m++){
+      const x = mToPx(m);
+      if(x < -2 || x > W+2) continue;
+      ctx.beginPath(); ctx.moveTo(x+0.5,0); ctx.lineTo(x+0.5,mainLaneY); ctx.stroke();
+    }
+    for(let y=0;y<=mainLaneY;y+=step){ ctx.beginPath(); ctx.moveTo(0,y+0.5); ctx.lineTo(W,y+0.5); ctx.stroke(); }
+  }
+
+  function drawZone(leftM, rightM, label){
+    const x1 = mToPx(leftM), x2 = mToPx(rightM);
+    if(x2 < 0 || x1 > W) return;
+    const fullHeight = mainLaneY - 40;
+    const zoneHeight = fullHeight / 3;
+    const zoneTop = mainLaneY - zoneHeight;
+    ctx.fillStyle = 'rgba(31,138,110,0.14)';
+    ctx.fillRect(x1, zoneTop, x2-x1, zoneHeight);
+    ctx.strokeStyle = '#1F8A6E';
+    ctx.setLineDash([4,3]);
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x1, zoneTop, x2-x1, zoneHeight);
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#1F8A6E';
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.fillText(label, (x1+x2)/2-18, zoneTop-8);
+  }
+
+  function drawFireBurst(cx, cy, radius, now, seed){
+    const t = now/1000;
+    const flicker = 0.82 + 0.18*Math.sin(t*13 + seed);
+    const r = radius*flicker;
+
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    grad.addColorStop(0, '#FFF3D6');
+    grad.addColorStop(0.18, '#FFD27A');
+    grad.addColorStop(0.42, '#F5871F');
+    grad.addColorStop(0.72, '#D23B1E');
+    grad.addColorStop(1, 'rgba(178,58,46,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+
+    const spikes = 10;
+    ctx.beginPath();
+    for(let i=0;i<=spikes;i++){
+      const ang = (i/spikes)*Math.PI*2;
+      const jitter = 0.55 + 0.45*Math.sin(t*9 + ang*5 + seed);
+      const rr = r*0.62*jitter;
+      const px = cx + Math.cos(ang)*rr;
+      const py = cy + Math.sin(ang)*rr*0.75;
+      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,176,55,0.85)';
+    ctx.fill();
+
+    ctx.fillStyle = '#FFF6E0';
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(0,r*0.16), 0, Math.PI*2); ctx.fill();
+
+    const sparkCount = 6;
+    for(let i=0;i<sparkCount;i++){
+      const ang = t*3 + seed + i*(Math.PI*2/sparkCount);
+      const dist = r*(0.75+0.35*Math.sin(t*6+i+seed));
+      const sx = cx + Math.cos(ang)*dist;
+      const sy = cy + Math.sin(ang)*dist*0.55;
+      ctx.fillStyle = 'rgba(255,220,120,'+(0.4+0.5*Math.abs(Math.sin(t*8+i+seed)))+')';
+      ctx.beginPath(); ctx.arc(sx, sy, 2.2, 0, Math.PI*2); ctx.fill();
+    }
+
+    // repeating "pop" — every cycle, a bright flash + expanding shockwave ring
+    const POP_PERIOD = 0.5;
+    const cyclePos = (((t + seed*0.17) % POP_PERIOD) / POP_PERIOD);
+    const ringR = radius*0.35 + radius*1.3*cyclePos;
+    const ringAlpha = Math.max(0, 1 - cyclePos*1.15);
+    if(ringAlpha > 0){
+      ctx.strokeStyle = 'rgba(255,214,140,'+(ringAlpha*0.85)+')';
+      ctx.lineWidth = 3*(1-cyclePos) + 1;
+      ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI*2); ctx.stroke();
+    }
+    const flashAlpha = Math.max(0, 1 - cyclePos*5);
+    if(flashAlpha > 0){
+      ctx.fillStyle = 'rgba(255,246,224,'+(flashAlpha*0.95)+')';
+      ctx.beginPath(); ctx.arc(cx, cy, radius*0.55*(1-cyclePos*0.4), 0, Math.PI*2); ctx.fill();
+    }
+  }
+
+  function pseudoRand(seed){
+    const x = Math.sin(seed*127.1)*43758.5453;
+    return x - Math.floor(x);
+  }
+
+  function drawMushroomCloud(cx, groundY, boxWidthPx, progress, seed){
+    const grow = Math.min(1, progress / 0.35); // rises fast, then billows
+    const age = Math.min(1, progress / 0.9); // 0=fresh flash, 1=aged smoky cloud
+    const maxH = Math.min(mainLaneY - 16, boxWidthPx * 2.6);
+    const h = maxH * (0.32 + 0.72*grow);
+    const stemW = boxWidthPx * (0.30 - 0.06*age);
+    const capR = boxWidthPx * 0.7 * (0.5 + 0.5*grow) * (1 + 0.12*age);
+    const stemTopY = groundY - h*0.58;
+    const capCenterY = groundY - h;
+    const fadeAlpha = progress > 0.8 ? Math.max(0.3, 1 - (progress-0.8)/0.2*0.7) : 1;
+    const t = performance.now()/1000;
+
+    // color evolves: white-hot flash -> orange/red -> smoky grey-brown as it ages
+    const core = age < 0.5
+      ? 'rgba(255,250,235,'+(0.97-age*0.3)+')'
+      : 'rgba(232,190,150,'+(0.65-age*0.25)+')';
+    const mid = 'rgba(' + Math.round(214-40*age) + ',' + Math.round(96-40*age) + ',' + Math.round(46-10*age) + ',0.88)';
+    const outer = 'rgba(' + Math.round(90-30*age) + ',' + Math.round(48-20*age) + ',' + Math.round(40-15*age) + ',0)';
+    const smokeRim = 'rgba(70,62,58,' + (0.35*age) + ')';
+
+    ctx.globalAlpha = fadeAlpha;
+
+    // ---- rising stem, slightly wavy for a less mechanical look ----
+    const wave = Math.sin(t*3 + seed)*stemW*0.08;
+    const stemGrad = ctx.createLinearGradient(cx, groundY, cx, stemTopY);
+    stemGrad.addColorStop(0, 'rgba(255,220,150,0.9)');
+    stemGrad.addColorStop(0.6, mid);
+    stemGrad.addColorStop(1, 'rgba(150,70,55,0.6)');
+    ctx.fillStyle = stemGrad;
+    ctx.beginPath();
+    ctx.moveTo(cx-stemW/2, groundY);
+    ctx.quadraticCurveTo(cx-stemW*0.7+wave, groundY-h*0.3, cx-stemW*0.55+wave, stemTopY);
+    ctx.lineTo(cx+stemW*0.55+wave, stemTopY);
+    ctx.quadraticCurveTo(cx+stemW*0.7+wave, groundY-h*0.3, cx+stemW/2, groundY);
+    ctx.closePath();
+    ctx.fill();
+
+    // ---- base "skirt" cloud where stem meets ground ----
+    const skirtR = boxWidthPx*0.42*(0.4+0.6*grow);
+    const skirtGrad = ctx.createRadialGradient(cx, groundY-4, 0, cx, groundY-4, skirtR);
+    skirtGrad.addColorStop(0, 'rgba(200,120,80,0.55)');
+    skirtGrad.addColorStop(1, 'rgba(120,70,55,0)');
+    ctx.fillStyle = skirtGrad;
+    ctx.beginPath(); ctx.ellipse(cx, groundY-4, skirtR, skirtR*0.32, 0, 0, Math.PI*2); ctx.fill();
+
+    // ---- layered, irregular cap tiers (lower = wider & darker, upper = tighter & brighter) ----
+    const tiers = [
+      {yFrac:0.34, rFrac:1.0,  puffs:6, alpha:0.85},
+      {yFrac:0.14, rFrac:0.78, puffs:5, alpha:0.9},
+      {yFrac:-0.02,rFrac:0.5,  puffs:4, alpha:0.95}
+    ];
+    tiers.forEach((tier, ti)=>{
+      const tierY = capCenterY + capR*tier.yFrac;
+      const tierR = capR*tier.rFrac;
+      for(let i=0;i<tier.puffs;i++){
+        const rnd1 = pseudoRand(seed*7.3 + ti*11 + i*3.1);
+        const rnd2 = pseudoRand(seed*3.1 + ti*5 + i*9.7);
+        const ang = (i/tier.puffs)*Math.PI*2 + rnd1*0.6;
+        const dist = tierR*(0.45 + rnd2*0.35);
+        const px = cx + Math.cos(ang)*dist + Math.sin(t*1.3+seed+i)*2;
+        const py = tierY + Math.sin(ang)*dist*0.55;
+        const r = tierR*(0.42 + rnd1*0.28);
+        const g = ctx.createRadialGradient(px,py,0,px,py,r);
+        g.addColorStop(0, core);
+        g.addColorStop(0.45, mid);
+        g.addColorStop(0.8, outer.replace(',0)', ',0.4)'));
+        g.addColorStop(1, outer);
+        ctx.globalAlpha = fadeAlpha*tier.alpha;
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(px,py,r,0,Math.PI*2); ctx.fill();
+      }
+    });
+
+    // subtle smoky rim darkening around the whole cap (adds depth/age)
+    if(age > 0.15){
+      ctx.globalAlpha = fadeAlpha;
+      ctx.strokeStyle = smokeRim;
+      ctx.lineWidth = capR*0.12;
+      ctx.beginPath();
+      ctx.ellipse(cx, capCenterY+capR*0.1, capR*0.95, capR*0.62, 0, 0, Math.PI*2);
+      ctx.stroke();
+    }
+
+    // bright flash core (strongest early, fades as it ages)
+    ctx.globalAlpha = fadeAlpha*(1-age*0.6);
+    const coreGrad = ctx.createRadialGradient(cx,capCenterY,0,cx,capCenterY,capR*0.7);
+    coreGrad.addColorStop(0,'rgba(255,250,230,0.9)');
+    coreGrad.addColorStop(0.55,'rgba(245,150,70,0.7)');
+    coreGrad.addColorStop(1,'rgba(150,50,30,0)');
+    ctx.fillStyle=coreGrad;
+    ctx.beginPath(); ctx.arc(cx,capCenterY,capR*0.7,0,Math.PI*2); ctx.fill();
+
+    // ---- ground shockwave + dust ring ----
+    ctx.globalAlpha = fadeAlpha;
+    const ringProgress = Math.min(1, progress/0.3);
+    const ringR = boxWidthPx*0.18 + boxWidthPx*1.05*ringProgress;
+    ctx.strokeStyle = 'rgba(255,205,150,'+(0.55*(1-ringProgress))+')';
+    ctx.lineWidth = 3*(1-ringProgress)+1;
+    ctx.beginPath();
+    ctx.ellipse(cx, groundY, ringR, Math.max(2,ringR*0.2), 0, 0, Math.PI*2);
+    ctx.stroke();
+    const dustR = ringR*0.7;
+    ctx.fillStyle = 'rgba(160,130,100,'+(0.18*(1-ringProgress))+')';
+    ctx.beginPath(); ctx.ellipse(cx, groundY, dustR, dustR*0.16, 0, 0, Math.PI*2); ctx.fill();
+
+    ctx.globalAlpha = 1;
+  }
+
+  const HAZARD_HEIGHT_M = 2;
+
+  function drawMissileFall(cx, groundY, fallProgress, seed){
+    const scale = scalePx();
+    const now = performance.now();
+
+    // pulsing warning reticle on the ground beneath the falling missile
+    const pulse = 0.65 + 0.35*Math.sin(now/140 + seed);
+    ctx.strokeStyle = 'rgba(226,60,40,'+(0.35+0.3*pulse)+')';
+    ctx.setLineDash([4,4]);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(cx, groundY, MISSILE_BLAST_RADIUS_M*scale*(0.5+0.15*pulse), 6*(0.5+0.15*pulse), 0, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(226,60,40,0.75)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx-9, groundY); ctx.lineTo(cx+9, groundY);
+    ctx.moveTo(cx, groundY-5); ctx.lineTo(cx, groundY+5);
+    ctx.stroke();
+
+    // missile falls with a gravity-like ease-in
+    const eased = fallProgress*fallProgress;
+    const startY = 4;
+    const endY = groundY - scale*0.12;
+    const my = startY + (endY-startY)*eased;
+    const wobble = Math.sin(seed + fallProgress*3)*2;
+    const mx = cx + wobble;
+    const tilt = Math.sin(seed + fallProgress*3)*0.06;
+
+    const bodyLen = Math.max(10, scale*0.5);
+    const bodyW = Math.max(4, scale*0.16);
+
+    // exhaust/smoke trail above the missile
+    const trailLen = bodyLen*2.2;
+    const trailGrad = ctx.createLinearGradient(mx, my-trailLen, mx, my-bodyLen*0.3);
+    trailGrad.addColorStop(0, 'rgba(210,208,202,0)');
+    trailGrad.addColorStop(1, 'rgba(230,228,222,0.55)');
+    ctx.strokeStyle = trailGrad;
+    ctx.lineWidth = Math.max(2, bodyW*0.5);
+    ctx.beginPath();
+    ctx.moveTo(mx - wobble*0.4, my-trailLen);
+    ctx.quadraticCurveTo(mx, my-trailLen*0.4, mx, my-bodyLen*0.3);
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(mx, my);
+    ctx.rotate(tilt);
+    // body (pointed nose downward)
+    const bodyGrad = ctx.createLinearGradient(-bodyW/2, 0, bodyW/2, 0);
+    bodyGrad.addColorStop(0, '#5A5A60');
+    bodyGrad.addColorStop(0.5, '#2E2E33');
+    bodyGrad.addColorStop(1, '#1C1C20');
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.moveTo(0, bodyLen*0.5);
+    ctx.quadraticCurveTo(bodyW*0.55, bodyLen*0.18, bodyW*0.42, -bodyLen*0.4);
+    ctx.lineTo(-bodyW*0.42, -bodyLen*0.4);
+    ctx.quadraticCurveTo(-bodyW*0.55, bodyLen*0.18, 0, bodyLen*0.5);
+    ctx.closePath();
+    ctx.fill();
+    // nose highlight stripe
+    ctx.fillStyle = 'rgba(226,60,40,0.85)';
+    ctx.beginPath();
+    ctx.moveTo(0, bodyLen*0.5);
+    ctx.quadraticCurveTo(bodyW*0.2, bodyLen*0.28, bodyW*0.14, bodyLen*0.08);
+    ctx.lineTo(-bodyW*0.14, bodyLen*0.08);
+    ctx.quadraticCurveTo(-bodyW*0.2, bodyLen*0.28, 0, bodyLen*0.5);
+    ctx.closePath();
+    ctx.fill();
+    // tail fins
+    ctx.fillStyle = '#1C1C20';
+    ctx.beginPath();
+    ctx.moveTo(-bodyW*0.42, -bodyLen*0.4); ctx.lineTo(-bodyW*1.5, -bodyLen*0.55); ctx.lineTo(-bodyW*0.3, -bodyLen*0.18);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(bodyW*0.42, -bodyLen*0.4); ctx.lineTo(bodyW*1.5, -bodyLen*0.55); ctx.lineTo(bodyW*0.3, -bodyLen*0.18);
+    ctx.closePath(); ctx.fill();
+    // thruster glow
+    ctx.fillStyle = 'rgba(255,180,80,0.9)';
+    ctx.beginPath(); ctx.ellipse(0, -bodyLen*0.42, bodyW*0.22, bodyW*0.4, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawAirstrikeExplosion(cx, groundY, progress, seed){
+    const scale = scalePx();
+    const maxR = MISSILE_BLAST_RADIUS_M * scale;
+    const grow = Math.min(1, progress/0.22);
+    const fade = progress > 0.35 ? Math.max(0, 1-(progress-0.35)/0.65) : 1;
+    const r = maxR * (0.35 + 0.75*grow);
+
+    ctx.globalAlpha = fade;
+
+    // ground shockwave ring
+    const ringT = Math.min(1, progress/0.3);
+    const ringR = maxR*0.25 + maxR*1.15*ringT;
+    ctx.strokeStyle = 'rgba(255,215,160,'+(0.55*(1-ringT))+')';
+    ctx.lineWidth = 3*(1-ringT)+1;
+    ctx.beginPath();
+    ctx.ellipse(cx, groundY, ringR, Math.max(2, ringR*0.2), 0, 0, Math.PI*2);
+    ctx.stroke();
+
+    // fireball
+    const fbCy = groundY - r*0.35;
+    const grad = ctx.createRadialGradient(cx, fbCy, 0, cx, fbCy, r);
+    grad.addColorStop(0, 'rgba(255,248,225,0.95)');
+    grad.addColorStop(0.35, 'rgba(250,172,72,0.9)');
+    grad.addColorStop(0.7, 'rgba(212,72,42,0.78)');
+    grad.addColorStop(1, 'rgba(90,40,30,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(cx, fbCy, r, 0, Math.PI*2); ctx.fill();
+
+    // scorched ground patch
+    ctx.fillStyle = 'rgba(70,55,45,'+(0.4*fade)+')';
+    ctx.beginPath(); ctx.ellipse(cx, groundY, r*0.85, Math.max(2,r*0.16), 0, 0, Math.PI*2); ctx.fill();
+
+    // lingering rising smoke
+    if(progress > 0.18){
+      const sp = (progress-0.18)/0.82;
+      for(let i=0;i<3;i++){
+        const sx = cx + Math.sin(seed+i*2.1)*maxR*0.25;
+        const sy = groundY - maxR*(0.3+0.5*i)*sp - r*0.2;
+        const sr = maxR*(0.28+0.12*i) * (0.5+0.5*sp);
+        ctx.fillStyle = 'rgba(75,68,62,'+(0.3*(1-sp*0.6)*fade)+')';
+        ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI*2); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawHazard(bomb){
+    const hz = bomb.hz;
+    const now = performance.now();
+    const heightPx = HAZARD_HEIGHT_M * scalePx();
+    const flameCenterY = mainLaneY - heightPx/2;
+    const burstR = Math.max(10, heightPx/2 * 1.15);
+
+    if(hz.type === 'sweep'){
+      if(bomb.active){
+        const x1 = mToPx(hz.startM), x2 = mToPx(hz.endM);
+        const fx = mToPx(bomb.frontM);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x1, 0, x2-x1, mainLaneY);
+        ctx.clip();
+        drawFireBurst(fx, flameCenterY, burstR, now, 0);
+        ctx.restore();
+      }
+    } else if(hz.type === 'nukes'){
+      if(bomb.active){
+        const x1 = mToPx(bomb.segStartM), x2 = mToPx(bomb.segEndM);
+        const segWidth = x2-x1;
+        const cx = (x1+x2)/2;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x1, 0, segWidth, mainLaneY);
+        ctx.clip();
+        drawMushroomCloud(cx, mainLaneY, segWidth, bomb.segProgress, bomb.idx*2.3);
+        ctx.restore();
+      }
+    } else if(hz.type === 'area'){
+      if(bomb.active){
+        const x1 = mToPx(hz.startM), x2 = mToPx(hz.endM);
+        const areaWidth = x2-x1;
+        const cols = Math.max(1, Math.round(areaWidth/(burstR*1.3)));
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x1, 0, areaWidth, mainLaneY);
+        ctx.clip();
+        for(let c=0; c<cols; c++){
+          const bx = x1 + areaWidth*((c+0.5)/cols);
+          drawFireBurst(bx, flameCenterY, burstR, now, c*4.1);
+        }
+        ctx.restore();
+      }
+    } else if(hz.type === 'missile'){
+      if(bomb.active && bomb.missiles.length){
+        const x1 = mToPx(hz.startM), x2 = mToPx(hz.endM);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(Math.min(x1,x2), 0, Math.abs(x2-x1), mainLaneY);
+        ctx.clip();
+        bomb.missiles.forEach((m)=>{
+          const cx = mToPx(m.impactM);
+          const seed = m.impactM*3.1 + m.idx*0.7;
+          if(m.progress < MISSILE_FALL_FRAC){
+            const fallProgress = m.progress / MISSILE_FALL_FRAC;
+            drawMissileFall(cx, mainLaneY, fallProgress, seed);
+          } else {
+            const explosionProgress = (m.progress - MISSILE_FALL_FRAC) / (1 - MISSILE_FALL_FRAC);
+            drawAirstrikeExplosion(cx, mainLaneY, explosionProgress, seed);
+          }
+        });
+        ctx.restore();
+      }
+    } else {
+      for(let i=0;i<hz.count;i++){
+        const segStartM = hz.baseM + i*hz.segLenM;
+        const segEndM = segStartM + hz.segLenM;
+        const isActive = bomb.active && bomb.idx === i;
+        if(isActive){
+          const x1 = mToPx(segStartM), x2 = mToPx(segEndM);
+          const segWidth = x2-x1;
+          const cols = Math.max(1, Math.round(segWidth/(burstR*1.3)));
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(x1, 0, segWidth, mainLaneY);
+          ctx.clip();
+          for(let c=0; c<cols; c++){
+            const bx = x1 + segWidth*((c+0.5)/cols);
+            drawFireBurst(bx, flameCenterY, burstR, now, i*13+c*3);
+          }
+          ctx.restore();
+        }
+      }
+    }
+  }
+
+  function drawLegStart(){
+    const x = mToPx(legStartM);
+    ctx.fillStyle = '#6B6459';
+    ctx.beginPath(); ctx.arc(x, mainLaneY, 3, 0, Math.PI*2); ctx.fill();
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.fillText(stage === 1 ? '출발지점' : '이어서 출발', x-20, mainLaneY-10);
+  }
+
+  function drawDistanceLabel(){
+    const cfg = currentStageCfg();
+    const targetCenterM = (cfg.targetLeftM+cfg.targetRightM)/2;
+    const x1 = mToPx(legStartM), x2 = mToPx(targetCenterM);
+    const fullHeight = mainLaneY - 40;
+    const zoneHeight = fullHeight / 3;
+    const zoneTop = mainLaneY - zoneHeight;
+    const y = zoneTop - scalePx();
+    ctx.strokeStyle = '#A79F8C'; ctx.lineWidth = 1;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(x1, y-6); ctx.lineTo(x1, y+6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2, y-6); ctx.lineTo(x2, y+6); ctx.stroke();
+
+    const label = (targetCenterM-legStartM).toFixed(1)+' m';
+    ctx.font = '700 20px "JetBrains Mono", monospace';
+    const tw = ctx.measureText(label).width;
+    const midX = (x1+x2)/2;
+    ctx.fillStyle = '#F7F4EC';
+    ctx.fillRect(midX-tw/2-6, y-27, tw+12, 22);
+    ctx.fillStyle = '#242220';
+    ctx.fillText(label, midX-tw/2, y-10);
+  }
+
+  function drawLane(px1, px2, y, color, alpha, ballOnEnd){
+    ctx.strokeStyle = color; ctx.globalAlpha = alpha; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(px1, y); ctx.lineTo(px2, y); ctx.stroke();
+    ctx.globalAlpha = 1;
+    if(ballOnEnd){
+      ctx.fillStyle = color;
+      ctx.fillRect(px2-ballR, y-ballR*2, ballR*2, ballR*2);
+      ctx.strokeStyle = '#242220'; ctx.lineWidth = 1;
+      ctx.strokeRect(px2-ballR, y-ballR*2, ballR*2, ballR*2);
+    } else {
+      ctx.globalAlpha = 0.6; ctx.fillStyle = color;
+      ctx.fillRect(px2-4, y-ballR-4, 8, 8);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawExplosion(px){
+    ctx.fillStyle = 'rgba(226,90,46,0.35)';
+    ctx.beginPath(); ctx.arc(px, (mainLaneY-ballR), 26, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#E25A2E';
+    ctx.beginPath(); ctx.arc(px, (mainLaneY-ballR), 14, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#FFF3E8';
+    ctx.beginPath(); ctx.arc(px, (mainLaneY-ballR), 6, 0, Math.PI*2); ctx.fill();
+  }
+
+  function drawExplosionAnim(px, progress){
+    const maxR = 46;
+    const r = 8 + maxR*progress;
+    ctx.globalAlpha = Math.max(0, 1-progress);
+    ctx.fillStyle = 'rgba(226,90,46,0.35)';
+    ctx.beginPath(); ctx.arc(px, (mainLaneY-ballR), r, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.globalAlpha = Math.max(0, 1-progress*1.3);
+    ctx.fillStyle = '#E25A2E';
+    ctx.beginPath(); ctx.arc(px, (mainLaneY-ballR), r*0.55, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.globalAlpha = Math.max(0, 1-progress*2.2);
+    ctx.fillStyle = '#FFF3E8';
+    ctx.beginPath(); ctx.arc(px, (mainLaneY-ballR), Math.max(0, 8*(1-progress)), 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    const spikes = 8;
+    ctx.strokeStyle = 'rgba(226,90,46,'+Math.max(0,0.7-progress*0.7)+')';
+    ctx.lineWidth = 2;
+    for(let i=0;i<spikes;i++){
+      const ang = (i/spikes)*Math.PI*2;
+      const innerR = r*0.5, outerR = r*1.05;
+      ctx.beginPath();
+      ctx.moveTo(px+Math.cos(ang)*innerR, (mainLaneY-ballR)+Math.sin(ang)*innerR);
+      ctx.lineTo(px+Math.cos(ang)*outerR, (mainLaneY-ballR)+Math.sin(ang)*outerR);
+      ctx.stroke();
+    }
+  }
+
+  function drawPillItem(cx, groundY){
+    const t = performance.now()/1000;
+    const bob = Math.sin(t*2.2)*3;
+    const y = groundY - 10 + bob;
+    const w = 20, h = 9;
+
+    ctx.save();
+    ctx.translate(cx, y);
+    // soft glow so it reads as an item, not scenery
+    const glow = ctx.createRadialGradient(0,0,0,0,0,w*1.3);
+    glow.addColorStop(0, 'rgba(255,255,255,0.35)');
+    glow.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0,0,w*1.3,0,Math.PI*2); ctx.fill();
+
+    ctx.rotate(-0.25);
+    // capsule outline
+    const r = h/2;
+    ctx.beginPath();
+    ctx.moveTo(-w/2+r, -r);
+    ctx.lineTo(w/2-r, -r);
+    ctx.arc(w/2-r, 0, r, -Math.PI/2, Math.PI/2);
+    ctx.lineTo(-w/2+r, r);
+    ctx.arc(-w/2+r, 0, r, Math.PI/2, -Math.PI/2);
+    ctx.closePath();
+    // two-tone halves (classic capsule look)
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = '#E85B5B';
+    ctx.fillRect(-w/2-2, -r-2, w/2+2, h+4);
+    ctx.fillStyle = '#F5F1E6';
+    ctx.fillRect(0, -r-2, w/2+2, h+4);
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(80,40,40,0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // center seam + highlight
+    ctx.strokeStyle = 'rgba(80,40,40,0.35)';
+    ctx.beginPath(); ctx.moveTo(0,-r); ctx.lineTo(0,r); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath(); ctx.ellipse(-w/4, -r*0.35, w*0.14, r*0.28, -0.3, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawScene(bombState){
+    drawGrid();
+    const cfg = currentStageCfg();
+    Object.keys(ACTIVE_ZONES).forEach((key)=>{
+      const z = ACTIVE_ZONES[key];
+      drawZone(z.targetLeftM, z.targetRightM, z.targetName);
+    });
+    Object.keys(bombState).forEach((key)=>{
+      drawHazard(bombState[key]);
+    });
+    if(gameStage === 2 && !sedativeCollected){
+      drawPillItem(mToPx(SEDATIVE_M), mainLaneY);
+    }
+    drawDistanceLabel();
+    drawLegStart();
+
+    ctx.strokeStyle = '#B7AD95'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, mainLaneY); ctx.lineTo(W, mainLaneY); ctx.stroke();
+
+    const ballPx = mToPx(ballM);
+    const startPx = mToPx(legStartM);
+    if(mode === 'flying' || mode === 'resting'){
+      drawLane(startPx, ballPx, mainLaneY, currentColor, 1, true);
+    } else if(mode === 'aiming'){
+      ctx.fillStyle = currentColor;
+      ctx.fillRect(startPx-ballR, mainLaneY-ballR*2, ballR*2, ballR*2);
+      ctx.strokeStyle = '#242220'; ctx.lineWidth = 1;
+      ctx.strokeRect(startPx-ballR, mainLaneY-ballR*2, ballR*2, ballR*2);
+    } else if(mode === 'exploding'){
+      drawLane(startPx, ballPx, mainLaneY, currentColor, 0.4, false);
+      const progress = Math.min(1, (performance.now()-explosionStart)/EXPLOSION_DURATION);
+      drawExplosionAnim(ballPx, progress);
+    } else if(mode === 'gameover'){
+      drawLane(startPx, ballPx, mainLaneY, currentColor, 0.5, false);
+      if(gameOverReason === 'bomb') drawExplosion(ballPx);
+    } else if(mode === 'win'){
+      ctx.fillStyle = currentColor;
+      ctx.fillRect(ballPx-ballR, mainLaneY-ballR*2, ballR*2, ballR*2);
+      ctx.strokeStyle = '#242220'; ctx.lineWidth = 1;
+      ctx.strokeRect(ballPx-ballR, mainLaneY-ballR*2, ballR*2, ballR*2);
+    }
+
+    drawMinimap(bombState);
+  }
+
+  let minimapSize = null;
+  function drawMinimap(bombState){
+    if(!minimapSize){
+      const initScale = scalePx();
+      minimapSize = { mmW: initScale * 5, mmH: initScale * 2 };
+    }
+    const mmW = minimapSize.mmW;
+    const mmH = minimapSize.mmH;
+    const pad = Math.max(3, mmH*0.12);
+
+    ctx.fillStyle = 'rgba(247,244,236,0.88)';
+    ctx.fillRect(0, 0, mmW, mmH);
+    ctx.strokeStyle = 'rgba(107,100,89,0.4)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, mmW-1, mmH-1);
+
+    const lastZone = getLastZoneCfg();
+    const worldEndM = lastZone.targetRightM;
+    if(worldEndM <= 0) return;
+    const usableW = mmW - pad*2;
+    const lineY = mmH*0.68;
+    function mapX(m){
+      return pad + Math.min(1, Math.max(0, m/worldEndM)) * usableW;
+    }
+
+    ctx.strokeStyle = '#B7AD95'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(mapX(0), lineY); ctx.lineTo(mapX(worldEndM), lineY); ctx.stroke();
+
+    const zoneKeys = Object.keys(ACTIVE_ZONES).map(Number).sort((a,b)=>a-b);
+    zoneKeys.forEach((k)=>{
+      const z = ACTIVE_ZONES[k];
+      const zx1 = mapX(z.targetLeftM), zx2 = mapX(z.targetRightM);
+      ctx.fillStyle = '#1F8A6E';
+      ctx.fillRect(zx1, lineY-Math.max(2,mmH*0.1), Math.max(2, zx2-zx1), Math.max(4,mmH*0.2));
+    });
+
+    // distance labels between consecutive safe zones
+    ctx.font = '700 ' + Math.max(7, mmH*0.15) + 'px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#1F8A6E';
+    ctx.textBaseline = 'alphabetic';
+    for(let i=0;i<zoneKeys.length-1;i++){
+      const zA = ACTIVE_ZONES[zoneKeys[i]];
+      const zB = ACTIVE_ZONES[zoneKeys[i+1]];
+      const centerA = (zA.targetLeftM + zA.targetRightM) / 2;
+      const centerB = (zB.targetLeftM + zB.targetRightM) / 2;
+      const gapM = centerB - centerA;
+      const midX = (mapX(zA.targetRightM) + mapX(zB.targetLeftM)) / 2;
+      const label = Math.round(gapM) + 'm';
+      const tw = ctx.measureText(label).width;
+      ctx.fillText(label, midX - tw/2, lineY - mmH*0.2);
+    }
+
+    // real-time bomb explosion markers (red)
+    if(bombState){
+      const segH = Math.max(4, mmH*0.2);
+      Object.keys(bombState).forEach((key)=>{
+        const b = bombState[key];
+        if(!b.active) return;
+        ctx.fillStyle = 'rgba(214,40,30,0.92)';
+        if(b.type === 'sweep'){
+          const fx = mapX(b.frontM);
+          ctx.beginPath(); ctx.arc(fx, lineY, Math.max(2,mmH*0.1), 0, Math.PI*2); ctx.fill();
+        } else if(b.type === 'area'){
+          const x1 = mapX(b.hz.startM), x2 = mapX(b.hz.endM);
+          ctx.fillRect(x1, lineY-segH/2, Math.max(2,x2-x1), segH);
+        } else if(b.type === 'missile'){
+          b.missiles.forEach((m)=>{
+            if(m.progress >= MISSILE_FALL_FRAC){
+              const mx = mapX(m.impactM);
+              ctx.beginPath(); ctx.arc(mx, lineY, Math.max(2,mmH*0.1), 0, Math.PI*2); ctx.fill();
+            }
+          });
+        } else {
+          const x1 = mapX(b.segStartM), x2 = mapX(b.segEndM);
+          ctx.fillRect(x1, lineY-segH/2, Math.max(2,x2-x1), segH);
+        }
+      });
+    }
+
+    // item markers (gold)
+    if(gameStage === 2 && !sedativeCollected){
+      const ix = mapX(SEDATIVE_M);
+      ctx.fillStyle = '#F0B429';
+      ctx.beginPath(); ctx.arc(ix, lineY, Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#8A5F0E'; ctx.lineWidth = 1; ctx.stroke();
+    }
+
+    ctx.fillStyle = '#6B6459';
+    ctx.beginPath(); ctx.arc(mapX(0), lineY, Math.max(1.5, mmH*0.06), 0, Math.PI*2); ctx.fill();
+
+    ctx.fillStyle = currentColor;
+    ctx.beginPath(); ctx.arc(mapX(Math.max(0, ballM)), lineY, Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#242220'; ctx.lineWidth = 1; ctx.stroke();
+  }
+
+  function buildFeedback(v0, f, success){
+    const bits = [];
+    if(gameStage === 2){
+      if(v0 <= 1000) bits.push('충격력이 작아 얼마 못 굴러갔어요');
+      else if(v0 >= 3000) bits.push('충격력이 커서 멀리까지 굴러갔어요');
+      if(f <= 5) bits.push('마찰력이 작아 잘 멈추지 않고 계속 굴러갔어요');
+      else if(f >= 15) bits.push('마찰력이 커서 금방 멈췄어요');
+    } else {
+      if(v0 <= 7) bits.push('초기속도가 작아 얼마 못 굴러갔어요');
+      else if(v0 >= 15) bits.push('초기속도가 커서 멀리까지 굴러갔어요');
+      if(f <= 5) bits.push('마찰력이 작아 잘 멈추지 않고 계속 굴러갔어요');
+      else if(f >= 15) bits.push('마찰력이 커서 금방 멈췄어요');
+    }
+    const cause = bits.length ? bits.join(', ') + '.' : '두 값이 비교적 평범한 조합이었어요.';
+    const targetName = currentStageCfg().targetName;
+    const verdict = success ? (targetName+'에 정확히 들어갔습니다!') : (targetName+'를 벗어났습니다. 값을 다시 노려보세요.');
+    return cause + ' ' + verdict;
+  }
+
+  function renderWorldList(){
+    worldCountEl.textContent = runs.length;
+    worldListEl.innerHTML = '';
+    runs.slice().reverse().forEach(r=>{
+      const li = document.createElement('li');
+      li.className = 'world-item' + (r.success ? ' ok' : '');
+      li.innerHTML =
+        '<span class="swatch" style="background:'+r.color+'"></span>' +
+        '<span class="mono">세계 '+r.id+' ['+r.stage+'단계] · v0 '+r.v0.toFixed(1)+' f '+r.force.toFixed(1)+'</span>' +
+        '<span class="tag '+(r.success?'ok':'no')+'">'+(r.success?'성공':'실패')+'</span>';
+      worldListEl.appendChild(li);
+    });
+  }
+
+  function getLastZoneCfg(){
+    const keys = Object.keys(ACTIVE_ZONES);
+    for(const k of keys){ if(ACTIVE_ZONES[k].isLast) return ACTIVE_ZONES[k]; }
+    return ACTIVE_ZONES[keys[keys.length-1]];
+  }
+
+  function finishShot(){
+    const cfg = currentStageCfg();
+    const finalM = Math.max(0, ballM);
+    ballM = finalM;
+    const success = finalM >= cfg.targetLeftM && finalM <= cfg.targetRightM;
+    const lastZoneCfg = getLastZoneCfg();
+    const overshotLastZone = finalM > lastZoneCfg.targetRightM;
+
+    let reachedZone2Directly = false, reachedZone3Directly = false, advancesToStage3 = false, winsStage1 = false;
+    if(gameStage === 1){
+      reachedZone2Directly = stage === 1 && finalM >= ZONE2_LEFT_M && finalM <= ZONE2_RIGHT_M;
+      reachedZone3Directly = (stage === 1 || stage === 2) && finalM >= ZONE3_LEFT_M && finalM <= ZONE3_RIGHT_M;
+      advancesToStage3 = reachedZone2Directly || (success && stage === 2);
+      winsStage1 = reachedZone3Directly || (success && stage === 3);
+    }
+
+    worldSeq++;
+    shotCount++;
+    shotCountEl.textContent = shotCount;
+    const anySuccess = success || reachedZone2Directly || reachedZone3Directly;
+    const record = {id:worldSeq, stage, v0:captured.v0, force:captured.force, color:currentColor, legStartM, finalM, success: anySuccess};
+    runs.push(record);
+    if(runs.length > MAX_WORLDS) runs.shift();
+    renderWorldList();
+    if(anySuccess){
+      lastSafeDistanceM = distanceOffsetM + finalM;
+    }
+
+    if(winsStage1){
+      mode = 'resting';
+      resultEl.className = 'result success';
+      resultEl.textContent = 'stage1: 운동의 구역 클리어!';
+      mainBtn.disabled = true;
+      mainBtn.textContent = '\u00A0';
+      mainBtn.onclick = null;
+      clearedStages.push(1);
+      showStageClearOverlay('stage1: 운동의 구역 클리어', 'stage2로 가기', startGameStage2);
+    } else if(advancesToStage3){
+      mode = 'resting';
+      resultEl.className = 'result success';
+      resultEl.textContent = '안전지대 2 도착! 곧바로 3단계로 이동합니다…';
+      mainBtn.disabled = true;
+      mainBtn.textContent = '3단계로 자동 이동 중…';
+      mainBtn.onclick = null;
+      setTimeout(()=>{ if(mode === 'resting' && stage !== 3) startZone3(); }, 900);
+    } else if(success && stage === 1 && gameStage === 1){
+      mode = 'resting';
+      resultEl.className = 'result success';
+      resultEl.textContent = '안전지대 1 도착! 곧바로 2단계로 이동합니다…';
+      mainBtn.disabled = true;
+      mainBtn.textContent = '2단계로 자동 이동 중…';
+      mainBtn.onclick = null;
+      setTimeout(()=>{ if(mode === 'resting' && stage === 1) startZone2(); }, 900);
+    } else if(success && stage === 1 && gameStage === 2){
+      mode = 'resting';
+      resultEl.className = 'result success';
+      resultEl.textContent = '안전지대 1 도착! 곧바로 안전지대 2로 이동합니다…';
+      mainBtn.disabled = true;
+      mainBtn.textContent = '이동 중…';
+      mainBtn.onclick = null;
+      setTimeout(()=>{ if(mode === 'resting' && stage === 1) startS2Zone2(); }, 900);
+    } else if(success && stage === 2 && gameStage === 2){
+      mode = 'resting';
+      resultEl.className = 'result success';
+      resultEl.textContent = '안전지대 2 도착! 곧바로 안전지대 3으로 이동합니다…';
+      mainBtn.disabled = true;
+      mainBtn.textContent = '이동 중…';
+      mainBtn.onclick = null;
+      setTimeout(()=>{ if(mode === 'resting' && stage === 2) startS2Zone3(); }, 900);
+    } else if(success && cfg.isLast && gameStage === 2){
+      mode = 'resting';
+      resultEl.className = 'result success';
+      resultEl.textContent = 'stage2: 충격량의 구역 클리어!';
+      mainBtn.disabled = true;
+      mainBtn.textContent = '\u00A0';
+      mainBtn.onclick = null;
+      clearedStages.push(2);
+      showStageClearOverlay('stage2: 충격량의 구역 클리어', '처음부터 시작', fullReset);
+    } else if(success && cfg.isLast){
+      mode = 'win';
+      resultEl.className = 'result success';
+      resultEl.textContent = '축하합니다! ' + cfg.targetName + '까지 모두 도달했습니다. 게임 클리어!';
+      mainBtn.disabled = false;
+      mainBtn.textContent = '처음부터 시작';
+      mainBtn.onclick = fullReset;
+    } else if(overshotLastZone){
+      triggerBoundaryGameOver();
+    } else {
+      const isFoul = finalM < currentHazardStartM();
+      if(isFoul){
+        mode = 'resting';
+        resultEl.className = 'result fail';
+        resultEl.textContent = '파울! 발사가 너무 약해서 폭탄 구역까지 닿지 못했습니다. 다시 도전해보세요.';
+        mainBtn.disabled = false;
+        mainBtn.textContent = '다시 도전';
+        mainBtn.onclick = startNewShot;
+        showFoulOverlay();
+      } else {
+        mode = 'resting';
+        resultEl.className = 'result fail';
+        resultEl.textContent = buildFeedback(captured.v0, captured.force, false) + ' 공은 그 자리에 멈춰 있습니다. 폭탄에 닿기 전까지는 계속 그대로예요.';
+        mainBtn.disabled = true;
+        mainBtn.textContent = '대기 중 (폭탄 주의)';
+        mainBtn.onclick = null;
+      }
+    }
+  }
+
+  function triggerGameOver(){
+    mode = 'exploding';
+    gameOverReason = 'bomb';
+    explosionStart = performance.now();
+    deathDistanceM = lastSafeDistanceM;
+    deathElapsedMs = gameStartTime !== null ? (performance.now() - gameStartTime) : 0;
+    mainBtn.disabled = true;
+    mainBtn.textContent = '\u00A0';
+    mainBtn.onclick = null;
+    resultEl.className = 'result explode';
+    resultEl.textContent = '폭발!';
+    stopBgLoop();
+    playGameOverSting();
+  }
+
+  function triggerBoundaryGameOver(){
+    mode = 'gameover';
+    gameOverReason = 'boundary';
+    deathDistanceM = lastSafeDistanceM;
+    deathElapsedMs = gameStartTime !== null ? (performance.now() - gameStartTime) : 0;
+    stopBgLoop();
+    playGameOverSting();
+    mainBtn.disabled = false;
+    mainBtn.textContent = '재도전';
+    mainBtn.onclick = returnToStageSelect;
+    resultEl.className = 'result explode';
+    resultEl.textContent = '게임 오버 — 안전구역을 벗어났습니다.';
+    gameoverDistanceEl.textContent = deathDistanceM.toFixed(1) + ' m';
+    gameoverTimeEl.textContent = formatTime(deathElapsedMs);
+    showGameOverOverlay('안전구역을 벗어났습니다.');
+  }
+
+  function finalizeGameOver(){
+    mode = 'gameover';
+    mainBtn.disabled = false;
+    mainBtn.textContent = '재도전';
+    mainBtn.onclick = returnToStageSelect;
+    resultEl.className = 'result explode';
+    resultEl.textContent = '게임 오버 — 폭탄에 맞았습니다.';
+    gameoverDistanceEl.textContent = deathDistanceM.toFixed(1) + ' m';
+    gameoverTimeEl.textContent = formatTime(deathElapsedMs);
+    showGameOverOverlay('폭탄에 맞았습니다.');
+  }
+
+  function returnToStageSelect(){
+    runs = [];
+    worldSeq = 0;
+    shotCount = 0;
+    stage = 1;
+    legStartM = 0;
+    ballM = 0;
+    distanceOffsetM = 0;
+    lastSafeDistanceM = 0;
+    clearedStages = [];
+    sedativeCollected = false;
+    sedativeUsed = false;
+    gaugeSpeedMultiplier = 1;
+    gamePausedForItem = false;
+    if(sedativeBtn) sedativeBtn.style.display = 'none';
+    if(sedativeStatusEl) sedativeStatusEl.classList.remove('show');
+    gameStage = 1;
+    ACTIVE_ZONES = STAGE1_ZONES;
+    ACTIVE_VIEWS = STAGE1_VIEWS;
+    QUANTITIES = QUANTITIES_STAGE1;
+    updateGaugeLabelsForStage();
+    rebuildTicks();
+    hazardSoundState = {};
+    frictionLineEl.style.display = 'none';
+    shotCountEl.textContent = shotCount;
+    renderWorldList();
+    hideGameOverOverlay();
+    hideStageClearOverlay();
+    stopBgLoop();
+    bgStep = 0;
+    if(musicStarted){
+      soundOn = true;
+      soundBtn.textContent = '🔊';
+      setMuted(false);
+      startBgLoop();
+    }
+    startNewShot();
+    introDone = false;
+
+    stageSelectEl.classList.remove('fade-out');
+    if(!document.body.contains(stageSelectEl)){
+      document.body.appendChild(stageSelectEl);
+    }
+    stageSelectEl.classList.add('show');
+  }
+
+  function masterLoop(now){
+    if(lastFrameTime === null) lastFrameTime = now;
+    const dt = Math.min((now-lastFrameTime)/1000, 0.032);
+    lastFrameTime = now;
+
+    if(!gamePausedForItem){
+      if(mode === 'aiming'){
+        const q = QUANTITIES[phaseIndex];
+        fraction += dir*q.speed*gaugeSpeedMultiplier*dt;
+        if(fraction >= 1){ fraction = 1; dir = -1; }
+        if(fraction <= 0){ fraction = 0; dir = 1; }
+        const els = gaugeEls(q.key);
+        els.marker.style.left = (fraction*100)+'%';
+      } else if(mode === 'flying'){
+        const prevBallM = ballM;
+        ballM += flightV*dt;
+        flightV = Math.max(0, flightV - flightDecel*dt);
+
+        if(gameStage === 2 && !sedativeCollected && prevBallM < SEDATIVE_M && ballM >= SEDATIVE_M){
+          collectSedative();
+        }
+
+        const outOfBoundsM = getLastZoneCfg().targetRightM + 5;
+        const stopped = flightV <= 0.05;
+        const outOfBounds = ballM > outOfBoundsM;
+        if(stopped || outOfBounds){
+          if(outOfBounds) ballM = outOfBoundsM;
+          finishShot();
+        }
+      } else if(mode === 'exploding'){
+        if(performance.now() - explosionStart >= EXPLOSION_DURATION){
+          finalizeGameOver();
+        }
+      }
+    }
+
+    const bomb = getBombState(now);
+    if(!gamePausedForItem && (mode === 'flying' || mode === 'resting') && isHazardHit(bomb)){
+      triggerGameOver();
+    }
+
+    if(introDone){
+      Object.keys(bomb).forEach((key)=>{
+        const b = bomb[key];
+        if(!hazardSoundState[key]) hazardSoundState[key] = {active:false, idx:-1, explodedSet:new Set()};
+        const prev = hazardSoundState[key];
+        if(b.type === 'missile'){
+          if(b.active){
+            b.missiles.forEach((m)=>{
+              if(m.progress >= MISSILE_FALL_FRAC && !prev.explodedSet.has(m.idx)){
+                playExplosionSound();
+                prev.explodedSet.add(m.idx);
+              }
+            });
+          } else {
+            prev.explodedSet.clear();
+          }
+        } else if(b.active){
+          const idxNow = (typeof b.idx === 'number') ? b.idx : 0;
+          if(!prev.active || idxNow !== prev.idx){
+            if(b.type === 'nukes') playNukeExplosionSound();
+            else playExplosionSound();
+          }
+          prev.idx = idxNow;
+        } else {
+          prev.idx = -1;
+        }
+        prev.active = b.active;
+      });
+    }
+
+    if(introDone && gameStartTime !== null && mode !== 'exploding' && mode !== 'gameover'){
+      playTimerEl.textContent = formatTime(now - gameStartTime);
+      playDistanceEl.textContent = (distanceOffsetM + ballM).toFixed(1) + ' m';
+    }
+
+    drawScene(bomb);
+    requestAnimationFrame(masterLoop);
+  }
+
+  buildTicks();
+  updateDistanceDisplay();
+  renderGaugeState();
+  requestAnimationFrame(masterLoop);
+
+  const splashEl = document.getElementById('splash');
+  const splashTitleEl = document.getElementById('splashTitle');
+  const startGameBtn = document.getElementById('startGameBtn');
+  const rotateOverlay = document.getElementById('rotateOverlay');
+
+  function isPortrait(){
+    return window.innerHeight > window.innerWidth;
+  }
+  function updateRotateOverlay(){
+    if(!introDone) return;
+    rotateOverlay.classList.toggle('show', isPortrait());
+  }
+  window.addEventListener('resize', updateRotateOverlay);
+  window.addEventListener('orientationchange', updateRotateOverlay);
+
+  const taglinePart1 = document.getElementById('taglinePart1');
+  const taglinePart2 = document.getElementById('taglinePart2');
+  setTimeout(()=>{ taglinePart1.classList.add('show'); }, 1000);
+  setTimeout(()=>{ taglinePart2.classList.add('show'); }, 2000);
+  setTimeout(()=>{ splashTitleEl.classList.add('show'); }, 3000);
+  const splashVersionEl = document.getElementById('splashVersion');
+  setTimeout(()=>{ splashVersionEl.classList.add('show'); }, 4000);
+  setTimeout(()=>{ startGameBtn.classList.add('show'); }, 5000);
+
+  const stageSelectEl = document.getElementById('stageSelect');
+  const stageCardBtns = document.querySelectorAll('.stage-card-btn');
+
+  startGameBtn.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    stageSelectEl.classList.add('show');
+    splashEl.classList.add('fade-out');
+    tryStartAudio();
+    setTimeout(()=>{
+      splashEl.remove();
+    }, 1000);
+  });
+
+  function beginGameFromSelect(chosenStage){
+    stageSelectEl.classList.add('fade-out');
+    setTimeout(()=>{ stageSelectEl.remove(); }, 1000);
+    introDone = true;
+    updateRotateOverlay();
+    gameStartTime = performance.now();
+
+    if(chosenStage === 2){
+      startGameStage2();
+    } else {
+      gameStage = 1;
+      ACTIVE_ZONES = STAGE1_ZONES;
+      ACTIVE_VIEWS = STAGE1_VIEWS;
+      QUANTITIES = QUANTITIES_STAGE1;
+      stage = 1;
+      legStartM = 0;
+      ballM = 0;
+      distanceOffsetM = 0;
+      lastSafeDistanceM = 0;
+      hazardSoundState = {};
+      frictionLineEl.style.display = 'none';
+      updateGaugeLabelsForStage();
+      rebuildTicks();
+      bombOrigin = performance.now();
+      startNewShot();
+      showStageBanner('stage1: 운동의 구역');
+    }
+  }
+
+  stageCardBtns.forEach((btn)=>{
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const chosenStage = parseInt(btn.dataset.stage, 10);
+      beginGameFromSelect(chosenStage);
+    });
+  });
+})();
+</script>
+<script>
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('sw.js').catch(()=>{});
+    });
+  }
+</script>
+</body>
+</html>
