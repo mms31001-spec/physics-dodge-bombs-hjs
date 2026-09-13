@@ -719,7 +719,7 @@
           <button type="button" class="sound-btn" id="soundBtn" aria-label="사운드">🔈</button>
           <button type="button" class="back-btn" id="backToSelectBtn">돌아가기</button>
         </div>
-        <div class="mass-badge" id="massBadge"><span id="frictionLine" style="display:none;">마찰력=<b class="mono">5N</b><br></span>물체 질량=<b class="mono">2kg</b><br>중력가속도=<b class="mono">10m/s²</b><br>눈금 한 칸=<b class="mono">1m</b></div>
+        <div class="mass-badge" id="massBadge"><span id="frictionLine" style="display:none;">마찰력=<b class="mono">4N</b><br></span>물체 질량=<b class="mono">2kg</b><br>중력가속도=<b class="mono">10m/s²</b><br>눈금 한 칸=<b class="mono">1m</b></div>
       </div>
       <div class="play-timer"><span id="playTimer">00:00</span> · <span id="playDistance">0.0 m</span></div>
       <div class="sedative-status" id="sedativeStatus">신경안정제 사용 중</div>
@@ -780,15 +780,15 @@
 
   // ---- World geometry (all in meters) ----
   const ZONE_WIDTH_M = 2;
-  const ZONE1_CENTER_M = 5;
+  const ZONE1_CENTER_M = 9;
   const ZONE1_LEFT_M = ZONE1_CENTER_M - ZONE_WIDTH_M/2;
   const ZONE1_RIGHT_M = ZONE1_CENTER_M + ZONE_WIDTH_M/2;
-  const CENTER_GAP_M = 20; // center-to-center distance between zone1 and zone2
+  const CENTER_GAP_M = 25; // center-to-center distance between zone1 and zone2
   const ZONE2_CENTER_M = ZONE1_CENTER_M + CENTER_GAP_M;
   const ZONE2_LEFT_M = ZONE2_CENTER_M - ZONE_WIDTH_M/2;
   const ZONE2_RIGHT_M = ZONE2_CENTER_M + ZONE_WIDTH_M/2;
   const GAP_M = ZONE2_LEFT_M - ZONE1_RIGHT_M; // edge-to-edge span the stage2 bombs fill
-  const CENTER_GAP2_M = 45; // center-to-center distance between zone2 and zone3
+  const CENTER_GAP2_M = 49; // center-to-center distance between zone2 and zone3
   const ZONE3_CENTER_M = ZONE2_CENTER_M + CENTER_GAP2_M;
   const ZONE3_LEFT_M = ZONE3_CENTER_M - ZONE_WIDTH_M/2;
   const ZONE3_RIGHT_M = ZONE3_CENTER_M + ZONE_WIDTH_M/2;
@@ -826,19 +826,19 @@
       targetLeftM: ZONE1_LEFT_M,
       targetRightM: ZONE1_RIGHT_M,
       targetName: '안전지대 1',
-      hazard: {type:'sweep', startM:1, endM:ZONE1_LEFT_M, sweepSec:1, pauseSec:2}
+      hazard: {type:'sweep', startM:1, endM:ZONE1_LEFT_M, sweepSec:1.5, pauseSec:2.5}
     },
     2: {
       targetLeftM: ZONE2_LEFT_M,
       targetRightM: ZONE2_RIGHT_M,
       targetName: '안전지대 2',
-      hazard: {type:'segments', baseM:6, segLenM:18/4, count:4, segDurationSec:0.5, pauseSec:3}
+      hazard: {type:'segments', baseM:10, segLenM:23/4, count:4, segDurationSec:0.5, pauseSec:4.5}
     },
     3: {
       targetLeftM: ZONE3_LEFT_M,
       targetRightM: ZONE3_RIGHT_M,
       targetName: '안전지대 3',
-      hazard: {type:'nukes', baseM:26, segLenM:43/10, count:10, segDurationSec:0.5, simultaneous:true, period:7.5},
+      hazard: {type:'nukes', baseM:35, segLenM:47/10, count:10, segDurationSec:0.5, simultaneous:true, period:8.5},
       isLast: true
     }
   };
@@ -865,7 +865,7 @@
     1: { startM: 0, spanM: S2_ZONE1_RIGHT_M + 3 }
   };
 
-  const STAGE1_FRICTION_N = 5; // fixed friction force for stage 1 (all zones)
+  const STAGE1_FRICTION_N = 4; // fixed friction force for stage 1 (all zones)
 
   const QUANTITIES_STAGE1 = [
     {key:'v0', label:'초기속도 v0', min:0, max:20, step:5, decimals:1, speed:1/3, unit:'m/s'}
