@@ -300,7 +300,7 @@
     align-items:start;
   }
 
-  .stage{background:var(--panel);border:1px solid var(--panel-border);border-radius:3px;padding:14px;position:relative;overflow:hidden;}
+  .stage{background:var(--panel);border:1px solid var(--panel-border);border-radius:3px;padding:14px;position:relative;}
   .stage-inner{ position:relative; }
   .gameover-overlay{
     position:absolute; inset:0;
@@ -637,6 +637,7 @@
       border:none;
       border-radius:0;
       margin:0 auto;
+      overflow:hidden;
     }
     .kakao-inapp .stage{
       width:min(100vw, calc((var(--real-vh, 100vh) - 50px) * (720/420)));
@@ -775,7 +776,7 @@
           <button type="button" class="sound-btn" id="soundBtn" aria-label="사운드">🔈</button>
           <button type="button" class="back-btn" id="backToSelectBtn">돌아가기</button>
         </div>
-        <div class="mass-badge" id="massBadge"><span id="frictionLine" style="display:none;">마찰력=<b class="mono">4N</b><br></span>물체 질량=<b class="mono">2kg</b><br>중력가속도=<b class="mono">10m/s²</b><br>눈금 한 칸=<b class="mono">1m</b></div>
+        <div class="mass-badge" id="massBadge"><span id="frictionLine" style="display:none;">마찰력=<b class="mono">4N</b><br></span>물체 질량=<b class="mono">2kg</b><br>눈금 한 칸=<b class="mono">1m</b></div>
       </div>
       <div class="play-timer"><span id="playTimer">00:00</span> · <span id="playDistance">0.0 m</span></div>
       <div class="sedative-status" id="sedativeStatus">신경안정제 사용 중</div>
@@ -1690,6 +1691,7 @@
   resetBtn.addEventListener('click', fullReset);
 
   function evalHazard(hz, now){
+    now = bombOrigin + Math.max(0, now - bombOrigin);
     if(hz.type === 'sweep'){
       const cycle = hz.sweepSec + hz.pauseSec;
       const elapsed = ((now - bombOrigin)/1000) % cycle;
@@ -2018,6 +2020,7 @@
   }
 
   function drawMushroomCloud(cx, groundY, boxWidthPx, progress, seed){
+    boxWidthPx = Math.abs(boxWidthPx);
     const grow = Math.min(1, progress / 0.35); // rises fast, then billows
     const age = Math.min(1, progress / 0.9); // 0=fresh flash, 1=aged smoky cloud
     const maxH = Math.min(mainLaneY - 16, boxWidthPx * 2.6);
