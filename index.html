@@ -99,36 +99,44 @@
   .stage-select.fade-out{opacity:0; pointer-events:none;}
   .stage-select.show{display:flex;}
   .stage-select-box{
-    width:min(100vw, calc(var(--real-vh, 100vh) * 0.88 * (720/420)));
-    aspect-ratio:720/420;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:calc(var(--rvh) * 0.8);
-    padding:calc(var(--rvh) * 0.8) 2vw;
-    overflow-y:auto;
-    box-sizing:border-box;
+    width:min(100vw, calc(var(--real-vh, 100vh) * 0.9 * (720/460)));
+    aspect-ratio:720/460;
+    position:relative;
+    overflow:hidden;
   }
   .kakao-inapp .stage-select-box{
-    width:min(100vw, calc((var(--real-vh, 100vh) - 50px) * 0.88 * (720/420)));
+    width:min(100vw, calc((var(--real-vh, 100vh) - 50px) * 0.9 * (720/460)));
+  }
+  .stage-select-inner{
+    position:absolute; top:0; left:0;
+    width:720px; height:460px;
+    transform-origin:top left;
+    transform:scale(var(--select-scale, 1));
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:10px;
+    padding:10px 20px;
+    box-sizing:border-box;
   }
   .stage-select-heading{
     font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
-    font-size:clamp(15px, calc(var(--rvh) * 5), 34px); font-weight:700; color:#FFFFFF;
+    font-size:30px; font-weight:700; color:#FFFFFF;
     letter-spacing:0.1em;
     text-align:center;
     text-shadow:0 0 20px rgba(255,255,255,0.25);
     line-height:1.15;
+    margin:0;
   }
   .stage-select-title{
     font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
-    font-size:clamp(36px, calc(var(--rvh) * 9.6), 66px); font-weight:600; color:#FFFFFF;
+    font-size:52px; font-weight:600; color:#FFFFFF;
     letter-spacing:0.14em;
   }
   .stage-select-grid{
     display:grid;
     grid-template-columns:repeat(4, minmax(0, 1fr));
-    gap:calc(var(--rvh) * 1.2) 1.4vw; justify-content:center;
+    gap:14px 16px; justify-content:center;
     width:100%;
-    max-width:900px;
+    max-width:680px;
     flex:1;
     min-height:0;
   }
@@ -137,8 +145,8 @@
     background:rgba(255,251,242,0.06);
     border:1px solid rgba(255,255,255,0.25);
     border-radius:4px;
-    padding:calc(var(--rvh) * 2.6) 0.4vw;
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:calc(var(--rvh) * 1.4);
+    padding:14px 6px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
     min-width:0;
   }
   .stage-card.disabled{
@@ -146,7 +154,7 @@
   }
   .stage-card-title{
     font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
-    font-size:clamp(8px, min(calc(var(--rvh) * 2.7), 2.3vw), 18px); color:#F2EDE0;
+    font-size:13px; color:#F2EDE0;
     text-align:center;
     letter-spacing:0;
     line-height:1.3;
@@ -156,23 +164,23 @@
     text-overflow:ellipsis;
   }
   .stage-card-btn, .stage-card-pending{
-    font-family:inherit; font-size:clamp(11px, calc(var(--rvh) * 2.3), 16px); font-weight:600; border-radius:4px;
+    font-family:inherit; font-size:13px; font-weight:600; border-radius:4px;
     display:flex; align-items:center; justify-content:center;
     box-sizing:border-box;
     flex:none;
     white-space:nowrap;
   }
   .stage-card-btn{
-    padding:calc(var(--rvh) * 0.9) calc(var(--rvh) * 2);
-    min-width:calc(var(--rvh) * 3.8); min-height:calc(var(--rvh) * 3.8);
+    padding:8px 16px;
+    min-width:34px; min-height:34px;
     cursor:pointer; border:1px solid #FFFFFF;
     background:#FFFFFF; color:#0A0A0A;
     -webkit-tap-highlight-color:transparent;
   }
   .stage-card-btn:active{ transform:scale(0.96); }
   .stage-card-pending{
-    padding:calc(var(--rvh) * 1) calc(var(--rvh) * 2);
-    min-height:calc(var(--rvh) * 4.2);
+    padding:8px 16px;
+    min-height:34px;
     border:1px solid rgba(242,237,224,0.4);
     background:transparent;
     color:rgba(242,237,224,0.6);
@@ -180,13 +188,13 @@
   .stage-select-footer{
     width:100%;
     max-width:400px;
-    padding-top:calc(var(--rvh) * 1.2);
+    padding-top:10px;
     border-top:1px dashed rgba(255,255,255,0.25);
     text-align:center;
   }
   .stage-select-footer p{
-    margin:0 0 calc(var(--rvh) * 0.3);
-    font-size:clamp(7px, calc(var(--rvh) * 1.3), 11.5px);
+    margin:0 0 3px;
+    font-size:11px;
     color:rgba(242,237,224,0.55);
     letter-spacing:0.02em;
   }
@@ -615,8 +623,6 @@
     .splash-title{ font-size:22px; letter-spacing:0.14em; }
     .splash-sub{ font-size:11.5px; letter-spacing:0.1em; }
     .splash-tagline{ font-size:13px; }
-    .stage-select-grid{ grid-template-columns:repeat(2, minmax(130px, 1fr)); max-width:100%; }
-    .stage-card{ width:auto; }
   }
 
   @media (orientation:landscape) and (max-height:500px){
@@ -653,6 +659,7 @@
 </div>
 <div class="stage-select" id="stageSelect">
   <div class="stage-select-box">
+   <div class="stage-select-inner" id="stageSelectInner">
     <div class="stage-select-heading">물리학으로 폭탄 피하기</div>
     <div class="stage-select-title">스테이지 선택</div>
     <div class="stage-select-grid">
@@ -694,6 +701,7 @@
       <p>E-mail: hjs31001@korea.kr</p>
       <p>v1.0</p>
     </div>
+   </div>
   </div>
 </div>
 <div class="rotate-overlay" id="rotateOverlay">
@@ -846,6 +854,23 @@
     } else {
       window.addEventListener('resize', updateStageScale);
       window.addEventListener('orientationchange', updateStageScale);
+    }
+  })();
+
+  (function setupStageSelectScale(){
+    const boxEl = document.querySelector('.stage-select-box');
+    const innerEl = document.getElementById('stageSelectInner');
+    if(!boxEl || !innerEl) return;
+    function updateSelectScale(){
+      const w = boxEl.clientWidth;
+      if(w > 0) boxEl.style.setProperty('--select-scale', w/720);
+    }
+    updateSelectScale();
+    if(window.ResizeObserver){
+      new ResizeObserver(updateSelectScale).observe(boxEl);
+    } else {
+      window.addEventListener('resize', updateSelectScale);
+      window.addEventListener('orientationchange', updateSelectScale);
     }
   })();
 
