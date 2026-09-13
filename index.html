@@ -358,7 +358,7 @@
   .confirm-btn-row{ display:flex; gap:10px; }
 
   .sedative-btn{
-    position:absolute; top:100px; right:14px;
+    position:absolute; bottom:112px; right:14px;
     width:52px; height:38px;
     border-radius:6px;
     background:rgba(255,251,242,0.94);
@@ -501,8 +501,9 @@
     z-index:6;
   }
   .sedative-status{
-    position:absolute; top:52px; left:50%;
-    transform:translateX(-50%);
+    position:absolute; bottom:134px; left:14px; right:118px;
+    display:none;
+    align-items:center; justify-content:center;
     background:rgba(232,91,91,0.92);
     border-radius:2px;
     padding:4px 10px;
@@ -511,9 +512,8 @@
     letter-spacing:0.03em;
     box-shadow:0 1px 6px rgba(0,0,0,0.12);
     z-index:6;
-    display:none;
   }
-  .sedative-status.show{display:block;}
+  .sedative-status.show{display:flex;}
   .mass-badge{
     background:rgba(255,251,242,0.92);
     border:1px solid var(--panel-border);
@@ -779,7 +779,7 @@
   const NORMAL_FORCE = MASS * GRAVITY_G; // N — balances gravity, net vertical force = 0
 
   // ---- World geometry (all in meters) ----
-  const ZONE_WIDTH_M = 2;
+  const ZONE_WIDTH_M = 3;
   const ZONE1_CENTER_M = 9;
   const ZONE1_LEFT_M = ZONE1_CENTER_M - ZONE_WIDTH_M/2;
   const ZONE1_RIGHT_M = ZONE1_CENTER_M + ZONE_WIDTH_M/2;
@@ -832,21 +832,22 @@
       targetLeftM: ZONE2_LEFT_M,
       targetRightM: ZONE2_RIGHT_M,
       targetName: '안전지대 2',
-      hazard: {type:'segments', baseM:10, segLenM:23/4, count:4, segDurationSec:0.5, pauseSec:4.5}
+      hazard: {type:'segments', baseM:10.5, segLenM:22/4, count:4, segDurationSec:0.5, pauseSec:4.5}
     },
     3: {
       targetLeftM: ZONE3_LEFT_M,
       targetRightM: ZONE3_RIGHT_M,
       targetName: '안전지대 3',
-      hazard: {type:'nukes', baseM:35, segLenM:47/10, count:10, segDurationSec:0.5, simultaneous:true, period:8.5},
+      hazard: {type:'nukes', baseM:35.5, segLenM:46/10, count:10, segDurationSec:0.5, simultaneous:true, period:8.5},
       isLast: true
     }
   };
 
   // ---- Stage 2: 충돌의 구역 ----
+  const S2_ZONE_WIDTH_M = 2;
   const S2_ZONE1_CENTER_M = 20;
-  const S2_ZONE1_LEFT_M = S2_ZONE1_CENTER_M - ZONE_WIDTH_M/2;
-  const S2_ZONE1_RIGHT_M = S2_ZONE1_CENTER_M + ZONE_WIDTH_M/2;
+  const S2_ZONE1_LEFT_M = S2_ZONE1_CENTER_M - S2_ZONE_WIDTH_M/2;
+  const S2_ZONE1_RIGHT_M = S2_ZONE1_CENTER_M + S2_ZONE_WIDTH_M/2;
 
   const SHIELD_LEN_M = 5;
   const SHIELD_SPEED_MPS = 4;
@@ -858,7 +859,7 @@
       targetLeftM: S2_ZONE1_LEFT_M,
       targetRightM: S2_ZONE1_RIGHT_M,
       targetName: '안전지대 1',
-      hazard: {type:'missile', startM:1, endM:S2_ZONE1_LEFT_M, activeDur:2, pauseSec:0, randomRangeFrac:1.0, count:8, missileDuration:0.9}
+      hazard: {type:'missile', startM:1, endM:S2_ZONE1_LEFT_M, randomRangeFrac:1.0, missileDuration:0.9, minGapSec:0.08, maxGapSec:0.12}
     }
   };
   const STAGE2_VIEWS = {
@@ -866,6 +867,7 @@
   };
 
   const STAGE1_FRICTION_N = 4; // fixed friction force for stage 1 (all zones)
+  const SEDATIVE_M = (ZONE1_RIGHT_M + ZONE2_LEFT_M) / 2; // item location, midpoint of stage1 zone1-2 gap
 
   const QUANTITIES_STAGE1 = [
     {key:'v0', label:'초기속도 v0', min:0, max:20, step:5, decimals:1, speed:1/3, unit:'m/s'}
@@ -1633,30 +1635,27 @@
       }
       return {type:'area', active:false, hz};
     } else if(hz.type === 'missile'){
-      const cycle = hz.activeDur + hz.pauseSec;
       const totalElapsed = (now - bombOrigin)/1000;
-      const cycleIndex = Math.floor(totalElapsed / cycle);
-      const elapsed = totalElapsed - cycleIndex*cycle;
-      if(elapsed < hz.activeDur){
-        const marginFrac = (1 - hz.randomRangeFrac)/2;
-        const rangeStart = hz.startM + (hz.endM-hz.startM)*marginFrac;
-        const rangeLen = (hz.endM-hz.startM)*hz.randomRangeFrac;
-        const launchWindow = Math.max(0, hz.activeDur - hz.missileDuration);
-        const missiles = [];
-        for(let i=0;i<hz.count;i++){
-          const launchOffset = hz.count > 1 ? (launchWindow*i/(hz.count-1)) : 0;
-          const localElapsed = elapsed - launchOffset;
-          if(localElapsed >= 0 && localElapsed < hz.missileDuration){
-            const rnd = pseudoRand(cycleIndex*97.7 + i*13.37 + 4.2);
-            const impactM = rangeStart + rnd*rangeLen;
-            const progress = localElapsed / hz.missileDuration;
-            const absorbed = (gameStage === 2) && isCoveredByShield(impactM, now);
-            missiles.push({impactM, progress, idx:i, absorbed, cycleIndex});
-          }
+      const marginFrac = (1 - hz.randomRangeFrac)/2;
+      const rangeStart = hz.startM + (hz.endM-hz.startM)*marginFrac;
+      const rangeLen = (hz.endM-hz.startM)*hz.randomRangeFrac;
+      const missiles = [];
+      let t = 0;
+      let i = 0;
+      while(t < totalElapsed + hz.missileDuration && i < 200000){
+        const localElapsed = totalElapsed - t;
+        if(localElapsed >= 0 && localElapsed < hz.missileDuration){
+          const rnd = pseudoRand(i*97.7 + 4.2);
+          const impactM = rangeStart + rnd*rangeLen;
+          const progress = localElapsed / hz.missileDuration;
+          const absorbed = (gameStage === 2) && isCoveredByShield(impactM, now);
+          missiles.push({impactM, progress, idx:i, absorbed, cycleIndex:i});
         }
-        return {type:'missile', active: missiles.length > 0, missiles, hz};
+        const gapRnd = pseudoRand(i*13.37 + 1.1);
+        t += hz.minGapSec + gapRnd*(hz.maxGapSec-hz.minGapSec);
+        i++;
       }
-      return {type:'missile', active:false, missiles:[], hz};
+      return {type:'missile', active: missiles.length > 0, missiles, hz};
     } else {
       const activeTotal = hz.count * hz.segDurationSec;
       const cycle = activeTotal + hz.pauseSec;
@@ -2032,30 +2031,31 @@
 
   const HAZARD_HEIGHT_M = 2;
 
-  function drawMissileFall(cx, groundY, fallProgress, seed){
+  function drawMissileFall(cx, groundY, fallProgress, seed, stopY){
     const scale = scalePx();
     const now = performance.now();
+    const targetY = (typeof stopY === 'number') ? stopY : groundY;
 
-    // pulsing warning reticle on the ground beneath the falling missile
+    // pulsing warning reticle beneath the falling missile, at its actual stop height
     const pulse = 0.65 + 0.35*Math.sin(now/140 + seed);
     ctx.strokeStyle = 'rgba(226,60,40,'+(0.35+0.3*pulse)+')';
     ctx.setLineDash([4,4]);
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.ellipse(cx, groundY, MISSILE_BLAST_RADIUS_M*scale*(0.5+0.15*pulse), 6*(0.5+0.15*pulse), 0, 0, Math.PI*2);
+    ctx.ellipse(cx, targetY, MISSILE_BLAST_RADIUS_M*scale*(0.5+0.15*pulse), 6*(0.5+0.15*pulse), 0, 0, Math.PI*2);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.strokeStyle = 'rgba(226,60,40,0.75)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(cx-9, groundY); ctx.lineTo(cx+9, groundY);
-    ctx.moveTo(cx, groundY-5); ctx.lineTo(cx, groundY+5);
+    ctx.moveTo(cx-9, targetY); ctx.lineTo(cx+9, targetY);
+    ctx.moveTo(cx, targetY-5); ctx.lineTo(cx, targetY+5);
     ctx.stroke();
 
-    // missile falls with a gravity-like ease-in
+    // missile falls with a gravity-like ease-in, stopping at its actual target height
     const eased = fallProgress*fallProgress;
     const startY = 4;
-    const endY = groundY - scale*0.12;
+    const endY = targetY - scale*0.12;
     const my = startY + (endY-startY)*eased;
     const wobble = Math.sin(seed + fallProgress*3)*2;
     const mx = cx + wobble;
@@ -2185,8 +2185,8 @@
     ctx.globalAlpha = 1;
   }
 
-  function drawShield(){
-    const now = performance.now();
+  function drawShield(nowTs){
+    const now = (typeof nowTs === 'number') ? nowTs : performance.now();
     const scale = scalePx();
     const groundY = mainLaneY;
     const shieldY = groundY - SHIELD_HEIGHT_M*scale;
@@ -2311,7 +2311,8 @@
           const seed = m.impactM*3.1 + m.idx*0.7;
           if(m.progress < MISSILE_FALL_FRAC){
             const fallProgress = m.progress / MISSILE_FALL_FRAC;
-            drawMissileFall(cx, mainLaneY, fallProgress, seed);
+            const stopY = m.absorbed ? (mainLaneY - SHIELD_HEIGHT_M*scalePx()) : mainLaneY;
+            drawMissileFall(cx, mainLaneY, fallProgress, seed, stopY);
           } else if(m.absorbed){
             const absorbProgress = (m.progress - MISSILE_FALL_FRAC) / (1 - MISSILE_FALL_FRAC);
             drawShieldAbsorb(cx, mainLaneY, absorbProgress);
@@ -2484,7 +2485,7 @@
     ctx.restore();
   }
 
-  function drawScene(bombState){
+  function drawScene(bombState, nowTs){
     drawGrid();
     const cfg = currentStageCfg();
     Object.keys(ACTIVE_ZONES).forEach((key)=>{
@@ -2492,11 +2493,14 @@
       drawZone(z.targetLeftM, z.targetRightM, z.targetName);
     });
     if(gameStage === 2){
-      drawShield();
+      drawShield(nowTs);
     }
     Object.keys(bombState).forEach((key)=>{
       drawHazard(bombState[key]);
     });
+    if(gameStage === 1 && !sedativeCollected){
+      drawPillItem(mToPx(SEDATIVE_M), mainLaneY);
+    }
     if(gameStage === 2 && stage === 1 && !collidedWithB){
       const z1 = ACTIVE_ZONES[1];
       const collideM = (z1.targetLeftM + z1.targetRightM) / 2;
@@ -2623,6 +2627,14 @@
 
     ctx.fillStyle = '#6B6459';
     ctx.beginPath(); ctx.arc(mapX(0), lineY, Math.max(1.5, mmH*0.06), 0, Math.PI*2); ctx.fill();
+
+    // item marker (gold)
+    if(gameStage === 1 && !sedativeCollected){
+      const ix = mapX(SEDATIVE_M);
+      ctx.fillStyle = '#F0B429';
+      ctx.beginPath(); ctx.arc(ix, lineY, Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#8A5F0E'; ctx.lineWidth = 1; ctx.stroke();
+    }
 
     ctx.fillStyle = currentColor;
     ctx.beginPath(); ctx.arc(mapX(Math.max(0, ballM)), lineY, Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
@@ -2884,6 +2896,10 @@
           }
         }
 
+        if(gameStage === 1 && !sedativeCollected && ballM >= SEDATIVE_M){
+          collectSedative();
+        }
+
         const outOfBoundsM = getLastZoneCfg().targetRightM + 5;
         const stopped = flightV <= 0.05;
         const outOfBounds = ballM > outOfBoundsM;
@@ -2904,8 +2920,9 @@
       }
     }
 
-    const bomb = getBombState(now);
-    const ballShielded = gameStage === 2 && isCoveredByShield(ballM, now);
+    const bombNow = (gamePausedForItem && itemPauseStartTime !== null) ? itemPauseStartTime : now;
+    const bomb = getBombState(bombNow);
+    const ballShielded = gameStage === 2 && isCoveredByShield(ballM, bombNow);
     if(!gamePausedForItem && !ballShielded && (mode === 'flying' || mode === 'resting') && isHazardHit(bomb)){
       triggerGameOver();
     }
@@ -2948,7 +2965,7 @@
       playDistanceEl.textContent = (distanceOffsetM + ballM).toFixed(1) + ' m';
     }
 
-    drawScene(bomb);
+    drawScene(bomb, bombNow);
     requestAnimationFrame(masterLoop);
   }
 
