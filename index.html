@@ -14,6 +14,23 @@
 <title>물리학으로 폭탄 피하기</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Serif+KR:wght@500;600&display=swap" rel="stylesheet">
+<script>
+  // KakaoTalk's in-app browser often misreports the visible viewport height
+  // (its own chrome overlays part of 100vh). Detect it and expose the real
+  // usable height as a CSS variable, scoped so nothing else (desktop, PWA
+  // home-screen launch) is affected.
+  (function(){
+    if(/KAKAOTALK/i.test(navigator.userAgent)){
+      document.documentElement.classList.add('kakao-inapp');
+      function setKakaoVH(){
+        document.documentElement.style.setProperty('--kakao-vh', window.innerHeight + 'px');
+      }
+      setKakaoVH();
+      window.addEventListener('resize', setKakaoVH);
+      window.addEventListener('orientationchange', setKakaoVH);
+    }
+  })();
+</script>
 <style>
   :root{
     --paper:#F7F4EC;
@@ -71,6 +88,9 @@
     padding:0.8vh 2vw;
     overflow-y:auto;
     box-sizing:border-box;
+  }
+  .kakao-inapp .stage-select-box{
+    width:min(100vw, calc(var(--kakao-vh, 100vh) * 0.88 * (720/420)));
   }
   .stage-select-heading{
     font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
@@ -592,6 +612,9 @@
       border:none;
       border-radius:0;
       margin:0 auto;
+    }
+    .kakao-inapp .stage{
+      width:min(100vw, calc(var(--kakao-vh, 100vh) * (720/420)));
     }
   }
 
