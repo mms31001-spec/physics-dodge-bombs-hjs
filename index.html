@@ -23,11 +23,28 @@
   // same way it already fits perfectly once installed to the home screen.
   (function(){
     function setRealVH(){
-      document.documentElement.style.setProperty('--real-vh', window.innerHeight + 'px');
+      const vv = window.visualViewport;
+      const h = (vv && vv.height) ? vv.height : window.innerHeight;
+      document.documentElement.style.setProperty('--real-vh', h + 'px');
     }
     setRealVH();
+    // some in-app browsers (KakaoTalk, etc.) settle their own chrome a beat
+    // after the page first reports its size, so re-check a few times early on
+    [0, 50, 150, 300, 600, 1000].forEach((ms)=> setTimeout(setRealVH, ms));
     window.addEventListener('resize', setRealVH);
     window.addEventListener('orientationchange', setRealVH);
+    if(window.visualViewport){
+      window.visualViewport.addEventListener('resize', setRealVH);
+      window.visualViewport.addEventListener('scroll', setRealVH);
+    }
+    // Some in-app browsers (KakaoTalk's included) draw their own header as a
+    // native overlay the WebView itself never reports through any viewport
+    // API, so no amount of measuring window.innerHeight/visualViewport can
+    // see it. Add a conservative fixed safety margin on top of the measured
+    // value for those specifically, as a backstop.
+    if(/KAKAOTALK/i.test(navigator.userAgent)){
+      document.documentElement.classList.add('kakao-inapp');
+    }
   })();
 </script>
 
@@ -88,6 +105,9 @@
     padding:0.8vh 2vw;
     overflow-y:auto;
     box-sizing:border-box;
+  }
+  .kakao-inapp .stage-select-box{
+    width:min(100vw, calc((var(--real-vh, 100vh) - 50px) * 0.88 * (720/420)));
   }
   .stage-select-heading{
     font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
@@ -271,7 +291,8 @@
     align-items:start;
   }
 
-  .stage{background:var(--panel);border:1px solid var(--panel-border);border-radius:3px;padding:14px;position:relative;}
+  .stage{background:var(--panel);border:1px solid var(--panel-border);border-radius:3px;padding:14px;position:relative;overflow:hidden;}
+  .stage-inner{ position:relative; }
   .gameover-overlay{
     position:absolute; inset:0;
     display:none; align-items:center; justify-content:center;
@@ -610,6 +631,14 @@
       border-radius:0;
       margin:0 auto;
     }
+    .kakao-inapp .stage{
+      width:min(100vw, calc((var(--real-vh, 100vh) - 50px) * (720/420)));
+    }
+    .stage-inner{
+      width:720px; height:420px;
+      transform-origin:top left;
+      transform:scale(var(--stage-scale, 1));
+    }
   }
 
 </style>
@@ -673,6 +702,7 @@
 <div class="wrap">
   <div class="layout">
     <div class="stage">
+     <div class="stage-inner" id="stageInner">
       <canvas id="sim" width="720" height="420"></canvas>
       <div class="gameover-overlay" id="gameoverOverlay">
         <div class="gameover-title">게임 오버</div>
@@ -752,6 +782,7 @@
       </div>
 
       <button type="button" class="tap-btn" id="tapLockBtn" aria-label="고정 (STOP)">STOP</button>
+     </div>
     </div>
 
     <div class="panel" style="display:none;">
@@ -794,6 +825,28 @@
   const MASS = 2; // kg, fixed ball mass
   const GRAVITY_G = 10; // m/s^2
   const NORMAL_FORCE = MASS * GRAVITY_G; // N — balances gravity, net vertical force = 0
+
+  // Keep the fixed-size (720x420) UI layer scaled to whatever size .stage
+  // actually renders at, so the gauge/buttons/badges shrink or grow together
+  // with the canvas instead of staying a fixed pixel size that can end up
+  // oversized (and covering the play area) when .stage itself is squeezed
+  // down to fit a shorter real viewport (see --real-vh above).
+  (function setupStageScale(){
+    const stageEl = document.querySelector('.stage');
+    const stageInnerEl = document.getElementById('stageInner');
+    if(!stageEl || !stageInnerEl) return;
+    function updateStageScale(){
+      const w = stageEl.clientWidth;
+      if(w > 0) stageEl.style.setProperty('--stage-scale', w/720);
+    }
+    updateStageScale();
+    if(window.ResizeObserver){
+      new ResizeObserver(updateStageScale).observe(stageEl);
+    } else {
+      window.addEventListener('resize', updateStageScale);
+      window.addEventListener('orientationchange', updateStageScale);
+    }
+  })();
 
   // ---- World geometry (all in meters) ----
   const ZONE_WIDTH_M = 3;
