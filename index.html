@@ -10,6 +10,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-title" content="물리학폭탄피하기">
 <title>물리학으로 폭탄 피하기</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Serif+KR:wght@500;600&display=swap" rel="stylesheet">
@@ -411,18 +412,16 @@
   .gauge.stage-gauge{
     position:absolute;
     bottom:14px;
-    width:calc(50% - 64px);
-    max-width:360px;
+    left:14px;
+    right:118px;
+    max-width:none;
     background:rgba(255,251,242,0.94);
     box-shadow:0 1px 6px rgba(0,0,0,0.08);
     z-index:5;
   }
-  .gauge.stage-gauge.pos-left{left:14px;}
-  .gauge.stage-gauge.pos-right{right:14px;}
   .tap-btn{
     position:absolute;
-    bottom:14px; left:50%;
-    transform:translateX(-50%);
+    bottom:14px; right:14px;
     width:90px; height:90px;
     border-radius:50%;
     background:var(--ink);
@@ -440,14 +439,42 @@
     transition:transform .08s ease, background .08s ease;
   }
   .tap-btn:active{
-    transform:translateX(-50%) scale(0.9);
+    transform:scale(0.9);
     background:#3a3733;
+  }
+  .tap-btn.armed{
+    background:#D6281E;
+    border-color:#FFE5E2;
+    animation:armed-pulse 1s ease-in-out infinite;
+  }
+  .tap-btn.armed:active{
+    background:#a81e17;
+  }
+  @keyframes armed-pulse{
+    0%, 100% { box-shadow:0 2px 10px rgba(214,40,30,0.35); }
+    50% { box-shadow:0 2px 22px rgba(214,40,30,0.75); }
   }
   .top-right-group{
     position:absolute; top:14px; right:14px;
-    display:flex; flex-direction:row; align-items:flex-start; gap:8px;
+    display:flex; flex-direction:column; align-items:flex-end; gap:8px;
     z-index:7;
   }
+  .top-right-row{
+    display:flex; flex-direction:row; align-items:flex-start; gap:8px;
+  }
+  .back-btn{
+    height:36px;
+    padding:0 12px;
+    border-radius:2px;
+    background:rgba(255,251,242,0.92);
+    border:1px solid var(--panel-border);
+    box-shadow:0 1px 6px rgba(0,0,0,0.08);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    font-family:inherit; font-size:12.5px; font-weight:600; color:var(--ink);
+    -webkit-tap-highlight-color:transparent;
+  }
+  .back-btn:active{ transform:scale(0.96); }
   .sound-btn{
     width:36px; height:36px;
     border-radius:2px;
@@ -583,15 +610,15 @@
     <div class="stage-select-title">스테이지 선택</div>
     <div class="stage-select-grid">
       <div class="stage-card">
-        <div class="stage-card-title">stage1: 운동의 구역</div>
+        <div class="stage-card-title">stage1: 마찰의 구역</div>
         <button type="button" class="stage-card-btn" data-stage="1">선택</button>
       </div>
       <div class="stage-card">
-        <div class="stage-card-title">stage2: 충격량의 구역</div>
+        <div class="stage-card-title">stage2: 충돌의 구역</div>
         <button type="button" class="stage-card-btn" data-stage="2">선택</button>
       </div>
       <div class="stage-card disabled">
-        <div class="stage-card-title">stage3: 에너지의 구역</div>
+        <div class="stage-card-title">stage3: 언덕의 구역</div>
         <span class="stage-card-pending">준비중</span>
       </div>
       <div class="stage-card disabled">
@@ -647,7 +674,7 @@
       </div>
 
       <div class="stage-clear-overlay" id="stageClearOverlay">
-        <div class="stage-clear-title" id="stageClearTitle">stage1: 운동의 구역 클리어</div>
+        <div class="stage-clear-title" id="stageClearTitle">stage1: 마찰의 구역 클리어</div>
         <div class="stage-clear-progress" id="stageClearProgress">클리어한 스테이지: 1</div>
         <div class="gameover-stats" id="stageClearStats">
           <div>이동 거리: <b class="mono" id="stageClearDistance">0 m</b></div>
@@ -675,18 +702,29 @@
         </div>
       </div>
 
+      <div class="item-pickup-overlay" id="backConfirmOverlay">
+        <div class="item-pickup-text">스테이지 선택창으로 돌아가시겠습니까?</div>
+        <div class="confirm-btn-row">
+          <button id="backConfirmBtn">확인</button>
+          <button id="backCancelBtn" class="secondary-btn">취소</button>
+        </div>
+      </div>
+
       <div class="stage-banner" id="stageBanner">
-        <div class="stage-banner-text" id="stageBannerText">stage1: 운동의 구역</div>
+        <div class="stage-banner-text" id="stageBannerText">stage1: 마찰의 구역</div>
       </div>
 
       <div class="top-right-group">
-        <button type="button" class="sound-btn" id="soundBtn" aria-label="사운드">🔈</button>
-        <div class="mass-badge" id="massBadge">공의 질량=<b class="mono">2kg</b><br>중력가속도=<b class="mono">10m/s²</b><br>눈금 한 칸=<b class="mono">1m</b><br><span id="frictionLine" style="display:none;">충격력 작용 시간=<b class="mono">0.01s</b> (고정)</span></div>
+        <div class="top-right-row">
+          <button type="button" class="sound-btn" id="soundBtn" aria-label="사운드">🔈</button>
+          <button type="button" class="back-btn" id="backToSelectBtn">돌아가기</button>
+        </div>
+        <div class="mass-badge" id="massBadge"><span id="frictionLine" style="display:none;">마찰력=<b class="mono">5N</b><br></span>물체 질량=<b class="mono">2kg</b><br>중력가속도=<b class="mono">10m/s²</b><br>눈금 한 칸=<b class="mono">1m</b></div>
       </div>
       <div class="play-timer"><span id="playTimer">00:00</span> · <span id="playDistance">0.0 m</span></div>
       <div class="sedative-status" id="sedativeStatus">신경안정제 사용 중</div>
 
-      <div class="gauge active stage-gauge pos-left" id="gauge-v0">
+      <div class="gauge active stage-gauge" id="gauge-v0">
         <div class="gauge-head">
           <span class="gauge-label" id="label-v0">초기속도 v0 (m/s)</span>
           <span class="gauge-status" id="status-v0">조준 중</span>
@@ -694,16 +732,6 @@
         <div class="gauge-track" id="track-v0"><div class="gauge-marker" id="marker-v0" style="left:0%"></div></div>
         <div class="gauge-ticks mono" id="ticks-v0"></div>
         <div class="gauge-current mono" id="value-v0">&nbsp;</div>
-      </div>
-
-      <div class="gauge waiting stage-gauge pos-right" id="gauge-force">
-        <div class="gauge-head">
-          <span class="gauge-label" id="label-force">마찰력 f (N)</span>
-          <span class="gauge-status" id="status-force">대기 중</span>
-        </div>
-        <div class="gauge-track" id="track-force"><div class="gauge-marker" id="marker-force" style="left:0%"></div></div>
-        <div class="gauge-ticks mono" id="ticks-force"></div>
-        <div class="gauge-current mono" id="value-force">&nbsp;</div>
       </div>
 
       <button type="button" class="tap-btn" id="tapLockBtn" aria-label="고정 (STOP)">STOP</button>
@@ -752,7 +780,7 @@
 
   // ---- World geometry (all in meters) ----
   const ZONE_WIDTH_M = 2;
-  const ZONE1_CENTER_M = 10;
+  const ZONE1_CENTER_M = 5;
   const ZONE1_LEFT_M = ZONE1_CENTER_M - ZONE_WIDTH_M/2;
   const ZONE1_RIGHT_M = ZONE1_CENTER_M + ZONE_WIDTH_M/2;
   const CENTER_GAP_M = 20; // center-to-center distance between zone1 and zone2
@@ -760,7 +788,7 @@
   const ZONE2_LEFT_M = ZONE2_CENTER_M - ZONE_WIDTH_M/2;
   const ZONE2_RIGHT_M = ZONE2_CENTER_M + ZONE_WIDTH_M/2;
   const GAP_M = ZONE2_LEFT_M - ZONE1_RIGHT_M; // edge-to-edge span the stage2 bombs fill
-  const CENTER_GAP2_M = 25; // center-to-center distance between zone2 and zone3
+  const CENTER_GAP2_M = 45; // center-to-center distance between zone2 and zone3
   const ZONE3_CENTER_M = ZONE2_CENTER_M + CENTER_GAP2_M;
   const ZONE3_LEFT_M = ZONE3_CENTER_M - ZONE_WIDTH_M/2;
   const ZONE3_RIGHT_M = ZONE3_CENTER_M + ZONE_WIDTH_M/2;
@@ -787,6 +815,10 @@
   let sedativeUsed = false;
   let gaugeSpeedMultiplier = 1;
   let gamePausedForItem = false;
+  let collidedWithB = false;
+  let objectBActive = false;
+  let objectBM = 0;
+  let objectBV = 0;
   let deathElapsedMs = 0;
 
   const STAGE1_ZONES = {
@@ -794,74 +826,52 @@
       targetLeftM: ZONE1_LEFT_M,
       targetRightM: ZONE1_RIGHT_M,
       targetName: '안전지대 1',
-      hazard: {type:'sweep', startM:1, endM:ZONE1_LEFT_M, sweepSec:2, pauseSec:3}
+      hazard: {type:'sweep', startM:1, endM:ZONE1_LEFT_M, sweepSec:1, pauseSec:2}
     },
     2: {
       targetLeftM: ZONE2_LEFT_M,
       targetRightM: ZONE2_RIGHT_M,
       targetName: '안전지대 2',
-      hazard: {type:'segments', baseM:ZONE1_RIGHT_M, segLenM:GAP_M/4, count:4, segDurationSec:0.5, pauseSec:3}
+      hazard: {type:'segments', baseM:6, segLenM:18/4, count:4, segDurationSec:0.5, pauseSec:3}
     },
     3: {
       targetLeftM: ZONE3_LEFT_M,
       targetRightM: ZONE3_RIGHT_M,
       targetName: '안전지대 3',
-      hazard: {type:'nukes', baseM:ZONE2_RIGHT_M, segLenM:GAP2_M/5, count:5, segDurationSec:0.5, pauseSec:4.5},
+      hazard: {type:'nukes', baseM:26, segLenM:43/10, count:10, segDurationSec:0.5, simultaneous:true, period:7.5},
       isLast: true
     }
   };
 
-  // ---- Stage 2: 충격량의 구역 ----
-  const STAGE2_FORCE_TIME_S = 0.01; // fixed force-application time for stage 2
-  const S2_ZONE1_CENTER_M = 10;
+  // ---- Stage 2: 충돌의 구역 ----
+  const S2_ZONE1_CENTER_M = 20;
   const S2_ZONE1_LEFT_M = S2_ZONE1_CENTER_M - ZONE_WIDTH_M/2;
   const S2_ZONE1_RIGHT_M = S2_ZONE1_CENTER_M + ZONE_WIDTH_M/2;
-  const S2_CENTER_GAP2_M = 15; // center-to-center distance, zone1 to zone2
-  const S2_ZONE2_CENTER_M = S2_ZONE1_CENTER_M + S2_CENTER_GAP2_M;
-  const S2_ZONE2_LEFT_M = S2_ZONE2_CENTER_M - ZONE_WIDTH_M/2;
-  const S2_ZONE2_RIGHT_M = S2_ZONE2_CENTER_M + ZONE_WIDTH_M/2;
-  const S2_GAP2_M = S2_ZONE2_LEFT_M - S2_ZONE1_RIGHT_M; // edge-to-edge span the missile strikes fill
-  const S2_CENTER_GAP3_M = 50; // center-to-center distance, zone2 to zone3
-  const S2_ZONE3_CENTER_M = S2_ZONE2_CENTER_M + S2_CENTER_GAP3_M;
-  const S2_ZONE3_LEFT_M = S2_ZONE3_CENTER_M - ZONE_WIDTH_M/2;
-  const S2_ZONE3_RIGHT_M = S2_ZONE3_CENTER_M + ZONE_WIDTH_M/2;
-  const S2_GAP3_M = S2_ZONE3_LEFT_M - S2_ZONE2_RIGHT_M; // edge-to-edge span the zone2-3 bombs fill
-  const SEDATIVE_M = (S2_ZONE1_RIGHT_M + S2_ZONE2_LEFT_M) / 2; // item location, midpoint of zone1-2 gap
+
+  const SHIELD_LEN_M = 5;
+  const SHIELD_SPEED_MPS = 4;
+  const SHIELD_HEIGHT_M = 2;
+  const SHIELD_TRACK_LEN_M = S2_ZONE1_LEFT_M; // shield cycles within [0, this]
 
   const STAGE2_ZONES = {
     1: {
       targetLeftM: S2_ZONE1_LEFT_M,
       targetRightM: S2_ZONE1_RIGHT_M,
       targetName: '안전지대 1',
-      hazard: {type:'area', startM:1, endM:S2_ZONE1_LEFT_M, period:5, flashDur:0.4}
-    },
-    2: {
-      targetLeftM: S2_ZONE2_LEFT_M,
-      targetRightM: S2_ZONE2_RIGHT_M,
-      targetName: '안전지대 2',
-      hazard: {type:'missile', startM:S2_ZONE1_RIGHT_M, endM:S2_ZONE2_LEFT_M, activeDur:2, pauseSec:3.5, randomRangeFrac:1.0, count:8, missileDuration:0.9}
-    },
-    3: {
-      targetLeftM: S2_ZONE3_LEFT_M,
-      targetRightM: S2_ZONE3_RIGHT_M,
-      targetName: '안전지대 3',
-      hazard: {type:'area', startM:S2_ZONE2_RIGHT_M, endM:S2_ZONE3_LEFT_M, period:13, flashDur:0.4},
-      isLast: true
+      hazard: {type:'missile', startM:1, endM:S2_ZONE1_LEFT_M, activeDur:2, pauseSec:0, randomRangeFrac:1.0, count:8, missileDuration:0.9}
     }
   };
   const STAGE2_VIEWS = {
-    1: { startM: 0, spanM: S2_ZONE1_RIGHT_M + S2_GAP2_M/3 },
-    2: { startM: S2_ZONE1_LEFT_M, spanM: (S2_ZONE2_RIGHT_M - S2_ZONE1_LEFT_M) + S2_GAP3_M/3 },
-    3: { startM: S2_ZONE2_LEFT_M, spanM: S2_ZONE3_RIGHT_M - S2_ZONE2_LEFT_M }
+    1: { startM: 0, spanM: S2_ZONE1_RIGHT_M + 3 }
   };
 
+  const STAGE1_FRICTION_N = 5; // fixed friction force for stage 1 (all zones)
+
   const QUANTITIES_STAGE1 = [
-    {key:'v0',    label:'초기속도 v0', min:0, max:20, step:5, decimals:1, speed:0.5, unit:'m/s'},
-    {key:'force', label:'마찰력 f',    min:0, max:20, step:5, decimals:1, speed:0.5, unit:'N'}
+    {key:'v0', label:'초기속도 v0', min:0, max:20, step:5, decimals:1, speed:1/3, unit:'m/s'}
   ];
   const QUANTITIES_STAGE2 = [
-    {key:'v0',    label:'충격력 F', min:0, max:4000, step:1000, decimals:0, speed:0.5, unit:'N'},
-    {key:'force', label:'마찰력 f', min:0, max:20,   step:5,    decimals:1, speed:0.5, unit:'N'}
+    {key:'v0', label:'초기속도 v0', min:0, max:20, step:5, decimals:1, speed:1/3, unit:'m/s'}
   ];
 
   let gameStage = 1;
@@ -911,6 +921,29 @@
   const gameoverTimeEl = document.getElementById('gameoverTime');
   const overlayRestartBtn = document.getElementById('overlayRestartBtn');
   overlayRestartBtn.addEventListener('click', ()=>{ returnToStageSelect(); });
+
+  const backToSelectBtn = document.getElementById('backToSelectBtn');
+  const backConfirmOverlay = document.getElementById('backConfirmOverlay');
+  const backConfirmBtn = document.getElementById('backConfirmBtn');
+  const backCancelBtn = document.getElementById('backCancelBtn');
+  backToSelectBtn.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    pauseForItem();
+    backConfirmOverlay.classList.add('show');
+  });
+  backConfirmBtn.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    backConfirmOverlay.classList.remove('show');
+    returnToStageSelect();
+  });
+  backCancelBtn.addEventListener('click', (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    backConfirmOverlay.classList.remove('show');
+    resumeFromItemPause();
+  });
 
   function showGameOverOverlay(reasonText){
     gameoverReasonText.textContent = reasonText;
@@ -1031,6 +1064,26 @@
     return (hz.type === 'sweep' || hz.type === 'area' || hz.type === 'missile') ? hz.startM : hz.baseM;
   }
 
+  // ---- Stage2 zone1: invincible shield that cycles along [0, SHIELD_TRACK_LEN_M] ----
+  function getShieldBands(now){
+    const elapsed = Math.max(0, (now - bombOrigin)/1000);
+    const s = SHIELD_SPEED_MPS * elapsed;
+    const front = s % SHIELD_TRACK_LEN_M;
+    if(front >= SHIELD_LEN_M){
+      return [{startM: front - SHIELD_LEN_M, endM: front}];
+    }
+    const bands = [{startM: 0, endM: front}];
+    const wrapStart = SHIELD_TRACK_LEN_M - (SHIELD_LEN_M - front);
+    if(wrapStart < SHIELD_TRACK_LEN_M){
+      bands.push({startM: wrapStart, endM: SHIELD_TRACK_LEN_M});
+    }
+    return bands;
+  }
+
+  function isCoveredByShield(m, now){
+    return getShieldBands(now).some((b)=> m >= b.startM && m <= b.endM);
+  }
+
   function updateDistanceDisplay(){
     const cfg = currentStageCfg();
     const targetCenterM = (cfg.targetLeftM+cfg.targetRightM)/2;
@@ -1043,7 +1096,7 @@
   }
   function currentViewStartM(){
     const span = currentSpanM();
-    if(mode !== 'aiming'){
+    if(mode !== 'aiming' && mode !== 'locked'){
       return ballM - span/2;
     }
     return ACTIVE_VIEWS[stage].startM;
@@ -1099,10 +1152,8 @@
   function rebuildTicks(){ buildTicks(); }
   function updateGaugeLabelsForStage(){
     const labelV0 = document.getElementById('label-v0');
-    const labelForce = document.getElementById('label-force');
-    const qv0 = QUANTITIES[0], qforce = QUANTITIES[1];
+    const qv0 = QUANTITIES[0];
     labelV0.textContent = qv0.label + ' (' + qv0.unit + ')';
-    labelForce.textContent = qforce.label + ' (' + qforce.unit + ')';
   }
 
   function renderGaugeState(){
@@ -1143,46 +1194,64 @@
 
     if(phaseIndex >= QUANTITIES.length){
       renderGaugeState();
-      mainBtn.disabled = true;
-      mainBtn.textContent = '샷 진행 중…';
+      mode = 'locked';
       resultEl.className = 'result';
-      if(gameStage === 2){
-        const F = captured.v0, friction = captured.force;
-        flightV = (F * STAGE2_FORCE_TIME_S) / MASS;
-        flightDecel = friction / MASS;
-        resultEl.textContent = 'F '+F.toFixed(0)+' N · f '+friction.toFixed(1)+' N — 퍼팅 중…';
-      } else {
-        resultEl.textContent = 'v0 '+captured.v0.toFixed(1)+' m/s · f '+captured.force.toFixed(1)+' N — 퍼팅 중…';
-        flightV = captured.v0;
-        flightDecel = captured.force / MASS;
-      }
-      ballM = legStartM;
-      mode = 'flying';
+      resultEl.textContent = 'v0 '+captured.v0.toFixed(1)+' m/s — SHOT 버튼을 눌러 발사하세요.';
+      mainBtn.disabled = false;
+      mainBtn.textContent = 'SHOT';
+      mainBtn.onclick = fireShot;
+      tapLockBtn.classList.add('armed');
+      tapLockBtn.textContent = 'SHOT';
     } else {
       renderGaugeState();
     }
+  }
+
+  function fireShot(){
+    if(mode !== 'locked') return;
+    tapLockBtn.classList.remove('armed');
+    mainBtn.disabled = true;
+    mainBtn.textContent = '샷 진행 중…';
+    mainBtn.onclick = null;
+    resultEl.className = 'result';
+    if(gameStage === 2){
+      flightV = captured.v0;
+      flightDecel = 0;
+      resultEl.textContent = 'v0 '+captured.v0.toFixed(1)+' m/s — 등속으로 이동 중…';
+    } else {
+      flightV = captured.v0;
+      flightDecel = STAGE1_FRICTION_N / MASS;
+      resultEl.textContent = 'v0 '+captured.v0.toFixed(1)+' m/s — 퍼팅 중…';
+    }
+    ballM = legStartM;
+    mode = 'flying';
+  }
+
+  function handleActionPress(){
+    if(mode === 'aiming') lockCurrentGauge();
+    else if(mode === 'locked') fireShot();
   }
 
   document.addEventListener('keydown', (e)=>{
     if(e.code === 'Space'){
       e.preventDefault();
       if(e.repeat) return;
-      lockCurrentGauge();
+      handleActionPress();
     }
   });
-  mainBtn.addEventListener('click', ()=>{ lockCurrentGauge(); });
+  mainBtn.addEventListener('click', ()=>{ handleActionPress(); });
 
   const tapLockBtn = document.getElementById('tapLockBtn');
   let tapLockHandled = false;
   tapLockBtn.addEventListener('pointerdown', (e)=>{
     e.preventDefault();
     tapLockHandled = true;
-    lockCurrentGauge();
+    handleActionPress();
   });
   tapLockBtn.addEventListener('click', (e)=>{
     e.preventDefault();
     if(tapLockHandled){ tapLockHandled = false; return; }
-    lockCurrentGauge();
+    handleActionPress();
   });
 
   // ---- Background music (procedural, plain Web Audio API — no external library) ----
@@ -1438,11 +1507,15 @@
     mode = 'aiming';
     gameOverReason = null;
     gaugeSpeedMultiplier = 1;
+    collidedWithB = false;
+    objectBActive = false;
     sedativeStatusEl.classList.remove('show');
     hideFoulOverlay();
     mainBtn.disabled = false;
     mainBtn.textContent = '고정 (Space)';
     mainBtn.onclick = null;
+    tapLockBtn.classList.remove('armed');
+    tapLockBtn.textContent = 'STOP';
     resultEl.className = 'result';
     resultEl.textContent = '새 샷 준비 완료. 스페이스바로 v0 값을 고정해보세요.';
     updateDistanceDisplay();
@@ -1463,20 +1536,6 @@
     resultEl.textContent = '안전지대 2 통과! 이어서 안전지대 3으로 — 스페이스바로 v0 값을 고정해보세요.';
   }
 
-  function startS2Zone2(){
-    stage = 2;
-    legStartM = ballM;
-    startNewShot();
-    resultEl.textContent = '안전지대 1 통과! 이어서 안전지대 2로 — 스페이스바로 충격력 값을 고정해보세요.';
-  }
-
-  function startS2Zone3(){
-    stage = 3;
-    legStartM = ballM;
-    startNewShot();
-    resultEl.textContent = '안전지대 2 통과! 이어서 안전지대 3으로 — 스페이스바로 충격력 값을 고정해보세요.';
-  }
-
   function startGameStage2(){
     distanceOffsetM += ballM;
     gameStage = 2;
@@ -1492,8 +1551,8 @@
     rebuildTicks();
     startNewShot();
     hideStageClearOverlay();
-    showStageBanner('stage2: 충격량의 구역');
-    frictionLineEl.style.display = 'inline';
+    showStageBanner('stage2: 충돌의 구역');
+    frictionLineEl.style.display = 'none';
   }
 
   function fullReset(){
@@ -1519,7 +1578,7 @@
     updateGaugeLabelsForStage();
     rebuildTicks();
     hazardSoundState = {};
-    frictionLineEl.style.display = 'none';
+    frictionLineEl.style.display = 'inline';
     shotCountEl.textContent = shotCount;
     renderWorldList();
     hideGameOverOverlay();
@@ -1528,7 +1587,7 @@
     if(musicStarted) startBgLoop();
     gameStartTime = performance.now();
     bombOrigin = performance.now();
-    showStageBanner('stage1: 운동의 구역');
+    showStageBanner('stage1: 마찰의 구역');
   }
   resetBtn.addEventListener('click', fullReset);
 
@@ -1542,6 +1601,19 @@
       }
       return {type:'sweep', active:false, hz};
     } else if(hz.type === 'nukes'){
+      if(hz.simultaneous){
+        const cycle = hz.period;
+        const elapsed = ((now - bombOrigin)/1000) % cycle;
+        if(elapsed < hz.segDurationSec){
+          const segProgress = elapsed / hz.segDurationSec;
+          const segs = [];
+          for(let idx=0; idx<hz.count; idx++){
+            segs.push({idx, segStartM: hz.baseM+idx*hz.segLenM, segEndM: hz.baseM+(idx+1)*hz.segLenM, segProgress});
+          }
+          return {type:'nukes', active:true, simultaneous:true, segs, hz};
+        }
+        return {type:'nukes', active:false, simultaneous:true, segs:[], hz};
+      }
       const activeTotal = hz.count * hz.segDurationSec;
       const cycle = activeTotal + hz.pauseSec;
       const elapsed = ((now - bombOrigin)/1000) % cycle;
@@ -1578,7 +1650,8 @@
             const rnd = pseudoRand(cycleIndex*97.7 + i*13.37 + 4.2);
             const impactM = rangeStart + rnd*rangeLen;
             const progress = localElapsed / hz.missileDuration;
-            missiles.push({impactM, progress, idx:i});
+            const absorbed = (gameStage === 2) && isCoveredByShield(impactM, now);
+            missiles.push({impactM, progress, idx:i, absorbed, cycleIndex});
           }
         }
         return {type:'missile', active: missiles.length > 0, missiles, hz};
@@ -1592,7 +1665,8 @@
         const idx = Math.min(hz.count-1, Math.floor(elapsed / hz.segDurationSec));
         const segStartM = hz.baseM + idx*hz.segLenM;
         const segEndM = segStartM + hz.segLenM;
-        return {type:'segments', active:true, idx, segStartM, segEndM, hz};
+        const segProgress = (elapsed - idx*hz.segDurationSec) / hz.segDurationSec;
+        return {type:'segments', active:true, idx, segStartM, segEndM, segProgress, hz};
       }
       return {type:'segments', active:false, hz};
     }
@@ -1618,7 +1692,11 @@
         return ballM >= bomb.hz.startM && ballM <= bomb.hz.endM;
       }
       if(bomb.type === 'missile'){
-        return bomb.missiles.some((m)=> m.progress >= MISSILE_FALL_FRAC && Math.abs(ballM - m.impactM) <= MISSILE_BLAST_RADIUS_M);
+        if(ballM < bomb.hz.startM || ballM > bomb.hz.endM) return false;
+        return bomb.missiles.some((m)=> !m.absorbed && m.progress >= MISSILE_FALL_FRAC && Math.abs(ballM - m.impactM) <= MISSILE_BLAST_RADIUS_M);
+      }
+      if(bomb.type === 'nukes' && bomb.simultaneous){
+        return bomb.segs.some((s)=> ballM >= s.segStartM && ballM < s.segEndM);
       }
       return ballM >= bomb.segStartM && ballM < bomb.segEndM;
     }
@@ -1726,6 +1804,119 @@
     }
   }
 
+  function drawFireBurstIntense(cx, cy, radius, now, seed, segProgress){
+    const t = now/1000;
+    const p = (typeof segProgress === 'number') ? segProgress : 0.5;
+    const grow = Math.min(1, p/0.16); // rapid expansion at the moment of ignition
+    const R = radius*1.3*grow;
+
+    function rnd(n){ const x = Math.sin((seed+n)*91.7)*43758.5453; return x-Math.floor(x); }
+    // smooth wobbling blob outline using quadratic curves through jittered points — organic, not polygonal
+    function blobPath(bx, by, br, points, wobbleAmt, phase){
+      const pts = [];
+      for(let i=0;i<points;i++){
+        const ang = (i/points)*Math.PI*2;
+        const rr = br*(1 + wobbleAmt*Math.sin(ang*3 + phase + seed*2) * (0.5+0.5*rnd(i)));
+        pts.push([bx+Math.cos(ang)*rr, by+Math.sin(ang)*rr*0.82]);
+      }
+      ctx.beginPath();
+      ctx.moveTo((pts[0][0]+pts[pts.length-1][0])/2, (pts[0][1]+pts[pts.length-1][1])/2);
+      for(let i=0;i<points;i++){
+        const p2 = pts[i], n2 = pts[(i+1)%points];
+        const mx = (p2[0]+n2[0])/2, my = (p2[1]+n2[1])/2;
+        ctx.quadraticCurveTo(p2[0], p2[1], mx, my);
+      }
+      ctx.closePath();
+    }
+
+    // big one-shot boom shockwave — expands hard and fast right at ignition, then it's done
+    const boomT = Math.min(1, p/0.4);
+    const boomAlpha = Math.max(0, 1-boomT);
+    if(boomAlpha > 0.01){
+      const boomR = radius*(0.5 + 2.1*boomT);
+      ctx.strokeStyle = 'rgba(255,225,170,'+(boomAlpha*0.8)+')';
+      ctx.lineWidth = Math.max(1, 7*(1-boomT));
+      ctx.beginPath(); ctx.ellipse(cx, cy, boomR, boomR*0.4, 0, 0, Math.PI*2); ctx.stroke();
+    }
+    // blinding flash at the instant of ignition, fading almost immediately
+    const flashT = Math.min(1, p/0.15);
+    const flashAlpha = Math.max(0, 1-flashT);
+    if(flashAlpha > 0.01){
+      const flashGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius*1.6);
+      flashGrad.addColorStop(0, 'rgba(255,255,255,'+(flashAlpha*0.95)+')');
+      flashGrad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = flashGrad;
+      ctx.beginPath(); ctx.arc(cx, cy, radius*1.6, 0, Math.PI*2); ctx.fill();
+    }
+
+    // soft ground scorch glow beneath the blast
+    const scorchGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, R*1.1);
+    scorchGrad.addColorStop(0, 'rgba(40,32,26,0.45)');
+    scorchGrad.addColorStop(1, 'rgba(40,32,26,0)');
+    ctx.fillStyle = scorchGrad;
+    ctx.beginPath(); ctx.ellipse(cx, cy, R*1.1, R*0.42, 0, 0, Math.PI*2); ctx.fill();
+
+    // rising smoke — soft gradient blobs with gentle organic wobble, drawn behind the fire
+    for(let i=0;i<3;i++){
+      const rise = Math.min(1, Math.max(0, (p - i*0.12)) * 1.3);
+      const sx = cx + Math.sin(seed+i*2.3+t*0.5)*R*0.25;
+      const sy = cy - R*0.25 - rise*R*1.7;
+      const sr = R*(0.34+0.16*i)*(0.4+0.6*rise);
+      const alpha = 0.4*rise*(1-p*0.3);
+      if(alpha <= 0.01) continue;
+      blobPath(sx, sy, sr, 7, 0.28, t*0.7+i);
+      const smokeGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
+      smokeGrad.addColorStop(0, 'rgba(70,64,60,'+alpha+')');
+      smokeGrad.addColorStop(1, 'rgba(50,46,44,0)');
+      ctx.fillStyle = smokeGrad;
+      ctx.fill();
+    }
+
+    // outer glow halo
+    const haloGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, R*1.3);
+    haloGrad.addColorStop(0, 'rgba(255,140,50,0.35)');
+    haloGrad.addColorStop(0.6, 'rgba(220,70,25,0.18)');
+    haloGrad.addColorStop(1, 'rgba(180,40,15,0)');
+    ctx.fillStyle = haloGrad;
+    ctx.beginPath(); ctx.arc(cx, cy, R*1.3, 0, Math.PI*2); ctx.fill();
+
+    // layered organic flame body — soft wobbling blobs, each with its own radial gradient (no hard polygon edges)
+    const layers = [
+      {scale:1.0,  wobble:0.16, colors:['#B01A0E','rgba(140,20,10,0)']},
+      {scale:0.78, wobble:0.20, colors:['#F5500F','rgba(200,50,15,0)']},
+      {scale:0.55, wobble:0.24, colors:['#FFB238','rgba(240,120,20,0)']},
+      {scale:0.32, wobble:0.22, colors:['#FFF0B0','rgba(255,200,80,0)']}
+    ];
+    layers.forEach((layer, i)=>{
+      const br = R*layer.scale*(0.92+0.12*Math.sin(t*9+i*2+seed));
+      blobPath(cx, cy - R*0.06*i, br, 9, layer.wobble, t*3+i*1.7);
+      const g = ctx.createRadialGradient(cx, cy-R*0.06*i, 0, cx, cy-R*0.06*i, br);
+      g.addColorStop(0, layer.colors[0]);
+      g.addColorStop(1, layer.colors[1]);
+      ctx.fillStyle = g;
+      ctx.fill();
+    });
+
+    // searing white-hot core, brightest right at ignition
+    ctx.fillStyle = 'rgba(255,255,255,'+(0.95-Math.min(1,p*1.3)*0.55)+')';
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(0,R*0.15), 0, Math.PI*2); ctx.fill();
+
+    // embers, flung outward hardest right after ignition then settling
+    const sparkCount = 9;
+    for(let i=0;i<sparkCount;i++){
+      const ang = seed*2 + i*(Math.PI*2/sparkCount);
+      const dist = R*(0.55 + 0.9*Math.min(1,p*2.5)) * (0.85+0.3*Math.sin(t*3+i+seed));
+      const sx = cx + Math.cos(ang)*dist;
+      const sy = cy + Math.sin(ang)*dist*0.5 - Math.max(0,dist-R*0.5)*0.35;
+      const glowR = 3.2;
+      const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR);
+      const a = (0.5+0.4*Math.abs(Math.sin(t*6+i+seed))) * (1-p*0.4);
+      g.addColorStop(0, 'rgba(255,220,140,'+a+')');
+      g.addColorStop(1, 'rgba(255,220,140,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(sx, sy, glowR, 0, Math.PI*2); ctx.fill();
+    }
+  }
   function pseudoRand(seed){
     const x = Math.sin(seed*127.1)*43758.5453;
     return x - Math.floor(x);
@@ -1970,6 +2161,85 @@
     ctx.globalAlpha = 1;
   }
 
+  function drawShieldAbsorb(cx, groundY, progress){
+    const scale = scalePx();
+    const shieldY = groundY - SHIELD_HEIGHT_M*scale;
+    const fade = Math.max(0, 1 - progress/0.6);
+    if(fade <= 0) return;
+    const r = scale*0.5*(0.4+0.8*Math.min(1,progress/0.3));
+    ctx.globalAlpha = fade;
+    ctx.strokeStyle = 'rgba(120,200,255,0.9)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, shieldY, r, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = 'rgba(160,220,255,0.55)';
+    ctx.beginPath(); ctx.arc(cx, shieldY, r*0.45, 0, Math.PI*2); ctx.fill();
+    // small debris falling from the point of absorption
+    for(let i=0;i<3;i++){
+      const a = i*2.1 + progress*4;
+      const dist = r*(0.6+progress*1.4);
+      ctx.fillStyle = 'rgba(90,90,96,'+(0.5*fade)+')';
+      ctx.beginPath();
+      ctx.arc(cx+Math.cos(a)*dist*0.4, shieldY+Math.sin(a)*dist*0.3+progress*scale*0.6, Math.max(1,scale*0.05), 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawShield(){
+    const now = performance.now();
+    const scale = scalePx();
+    const groundY = mainLaneY;
+    const shieldY = groundY - SHIELD_HEIGHT_M*scale;
+    const bands = getShieldBands(now);
+    const t = now/1000;
+    ctx.save();
+    bands.forEach((b)=>{
+      const x1 = mToPx(b.startM), x2 = mToPx(b.endM);
+      if(x2 <= x1) return;
+      const h = scale*0.55;
+      const grad = ctx.createLinearGradient(0, shieldY-h/2, 0, shieldY+h/2);
+      grad.addColorStop(0, 'rgba(140,215,255,0.12)');
+      grad.addColorStop(0.5, 'rgba(120,205,255,0.42)');
+      grad.addColorStop(1, 'rgba(140,215,255,0.12)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x1, shieldY-h/2, x2-x1, h);
+      ctx.strokeStyle = 'rgba(190,235,255,0.85)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x1, shieldY-h/2, x2-x1, h);
+      // soft shimmer sweep
+      const shimmerX = x1 + ((t*140) % Math.max(1,(x2-x1)));
+      const shimmerGrad = ctx.createLinearGradient(shimmerX-10, 0, shimmerX+10, 0);
+      shimmerGrad.addColorStop(0, 'rgba(255,255,255,0)');
+      shimmerGrad.addColorStop(0.5, 'rgba(255,255,255,0.5)');
+      shimmerGrad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = shimmerGrad;
+      ctx.fillRect(Math.max(x1,shimmerX-10), shieldY-h/2, Math.min(20, x2-Math.max(x1,shimmerX-10)), h);
+      // support struts down to the ground
+      ctx.strokeStyle = 'rgba(120,205,255,0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x1, shieldY+h/2); ctx.lineTo(x1, groundY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x2, shieldY+h/2); ctx.lineTo(x2, groundY); ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  function drawObjectB(m, speedMps){
+    const x = mToPx(m);
+    ctx.fillStyle = '#B94A4A';
+    ctx.fillRect(x-ballR, mainLaneY-ballR*2, ballR*2, ballR*2);
+    ctx.strokeStyle = '#242220'; ctx.lineWidth = 1;
+    ctx.strokeRect(x-ballR, mainLaneY-ballR*2, ballR*2, ballR*2);
+    ctx.font = '600 11px -apple-system, sans-serif';
+    ctx.fillStyle = '#242220';
+    ctx.textAlign = 'center';
+    ctx.fillText('2kg', x, mainLaneY-ballR*2-6);
+    if(typeof speedMps === 'number'){
+      ctx.textAlign = 'left';
+      ctx.fillText(speedMps.toFixed(1)+' m/s', x+ballR+5, mainLaneY-ballR);
+    }
+    ctx.textAlign = 'left';
+  }
+
   function drawHazard(bomb){
     const hz = bomb.hz;
     const now = performance.now();
@@ -1989,7 +2259,21 @@
         ctx.restore();
       }
     } else if(hz.type === 'nukes'){
-      if(bomb.active){
+      if(bomb.simultaneous){
+        if(bomb.active){
+          bomb.segs.forEach((s)=>{
+            const x1 = mToPx(s.segStartM), x2 = mToPx(s.segEndM);
+            const segWidth = x2-x1;
+            const cx = (x1+x2)/2;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x1, 0, segWidth, mainLaneY);
+            ctx.clip();
+            drawMushroomCloud(cx, mainLaneY, segWidth, s.segProgress, s.idx*2.3);
+            ctx.restore();
+          });
+        }
+      } else if(bomb.active){
         const x1 = mToPx(bomb.segStartM), x2 = mToPx(bomb.segEndM);
         const segWidth = x2-x1;
         const cx = (x1+x2)/2;
@@ -2028,6 +2312,9 @@
           if(m.progress < MISSILE_FALL_FRAC){
             const fallProgress = m.progress / MISSILE_FALL_FRAC;
             drawMissileFall(cx, mainLaneY, fallProgress, seed);
+          } else if(m.absorbed){
+            const absorbProgress = (m.progress - MISSILE_FALL_FRAC) / (1 - MISSILE_FALL_FRAC);
+            drawShieldAbsorb(cx, mainLaneY, absorbProgress);
           } else {
             const explosionProgress = (m.progress - MISSILE_FALL_FRAC) / (1 - MISSILE_FALL_FRAC);
             drawAirstrikeExplosion(cx, mainLaneY, explosionProgress, seed);
@@ -2044,14 +2331,20 @@
           const x1 = mToPx(segStartM), x2 = mToPx(segEndM);
           const segWidth = x2-x1;
           const cols = Math.max(1, Math.round(segWidth/(burstR*1.3)));
+          const colWidth = segWidth/cols;
+          const fireR = Math.min(burstR, colWidth/3.6);
+          const midIndex = Math.floor(cols/2);
           ctx.save();
           ctx.beginPath();
           ctx.rect(x1, 0, segWidth, mainLaneY);
           ctx.clip();
           for(let c=0; c<cols; c++){
+            if(c === midIndex) continue;
             const bx = x1 + segWidth*((c+0.5)/cols);
-            drawFireBurst(bx, flameCenterY, burstR, now, i*13+c*3);
+            drawFireBurstIntense(bx, flameCenterY, fireR, now, i*13+c*3, bomb.segProgress);
           }
+          const midBx = x1 + segWidth*((midIndex+0.5)/cols);
+          drawFireBurstIntense(midBx, flameCenterY, fireR*3, now, i*13+midIndex*3, bomb.segProgress);
           ctx.restore();
         }
       }
@@ -2198,11 +2491,19 @@
       const z = ACTIVE_ZONES[key];
       drawZone(z.targetLeftM, z.targetRightM, z.targetName);
     });
+    if(gameStage === 2){
+      drawShield();
+    }
     Object.keys(bombState).forEach((key)=>{
       drawHazard(bombState[key]);
     });
-    if(gameStage === 2 && !sedativeCollected){
-      drawPillItem(mToPx(SEDATIVE_M), mainLaneY);
+    if(gameStage === 2 && stage === 1 && !collidedWithB){
+      const z1 = ACTIVE_ZONES[1];
+      const collideM = (z1.targetLeftM + z1.targetRightM) / 2;
+      const gapM = (ballR*2) / scalePx();
+      drawObjectB(collideM + gapM);
+    } else if(objectBActive){
+      drawObjectB(objectBM, objectBV);
     }
     drawDistanceLabel();
     drawLegStart();
@@ -2214,7 +2515,7 @@
     const startPx = mToPx(legStartM);
     if(mode === 'flying' || mode === 'resting'){
       drawLane(startPx, ballPx, mainLaneY, currentColor, 1, true);
-    } else if(mode === 'aiming'){
+    } else if(mode === 'aiming' || mode === 'locked'){
       ctx.fillStyle = currentColor;
       ctx.fillRect(startPx-ballR, mainLaneY-ballR*2, ballR*2, ballR*2);
       ctx.strokeStyle = '#242220'; ctx.lineWidth = 1;
@@ -2303,24 +2604,21 @@
           ctx.fillRect(x1, lineY-segH/2, Math.max(2,x2-x1), segH);
         } else if(b.type === 'missile'){
           b.missiles.forEach((m)=>{
-            if(m.progress >= MISSILE_FALL_FRAC){
+            if(!m.absorbed && m.progress >= MISSILE_FALL_FRAC){
               const mx = mapX(m.impactM);
               ctx.beginPath(); ctx.arc(mx, lineY, Math.max(2,mmH*0.1), 0, Math.PI*2); ctx.fill();
             }
+          });
+        } else if(b.type === 'nukes' && b.simultaneous){
+          b.segs.forEach((s)=>{
+            const sx1 = mapX(s.segStartM), sx2 = mapX(s.segEndM);
+            ctx.fillRect(sx1, lineY-segH/2, Math.max(2,sx2-sx1), segH);
           });
         } else {
           const x1 = mapX(b.segStartM), x2 = mapX(b.segEndM);
           ctx.fillRect(x1, lineY-segH/2, Math.max(2,x2-x1), segH);
         }
       });
-    }
-
-    // item markers (gold)
-    if(gameStage === 2 && !sedativeCollected){
-      const ix = mapX(SEDATIVE_M);
-      ctx.fillStyle = '#F0B429';
-      ctx.beginPath(); ctx.arc(ix, lineY, Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle = '#8A5F0E'; ctx.lineWidth = 1; ctx.stroke();
     }
 
     ctx.fillStyle = '#6B6459';
@@ -2331,20 +2629,16 @@
     ctx.strokeStyle = '#242220'; ctx.lineWidth = 1; ctx.stroke();
   }
 
-  function buildFeedback(v0, f, success){
+  function buildFeedback(v0, success){
     const bits = [];
     if(gameStage === 2){
-      if(v0 <= 1000) bits.push('충격력이 작아 얼마 못 굴러갔어요');
-      else if(v0 >= 3000) bits.push('충격력이 커서 멀리까지 굴러갔어요');
-      if(f <= 5) bits.push('마찰력이 작아 잘 멈추지 않고 계속 굴러갔어요');
-      else if(f >= 15) bits.push('마찰력이 커서 금방 멈췄어요');
+      if(v0 <= 7) bits.push('초기속도가 작아 얼마 못 나아갔어요');
+      else if(v0 >= 15) bits.push('초기속도가 커서 금방 멀리까지 갔어요');
     } else {
       if(v0 <= 7) bits.push('초기속도가 작아 얼마 못 굴러갔어요');
       else if(v0 >= 15) bits.push('초기속도가 커서 멀리까지 굴러갔어요');
-      if(f <= 5) bits.push('마찰력이 작아 잘 멈추지 않고 계속 굴러갔어요');
-      else if(f >= 15) bits.push('마찰력이 커서 금방 멈췄어요');
     }
-    const cause = bits.length ? bits.join(', ') + '.' : '두 값이 비교적 평범한 조합이었어요.';
+    const cause = bits.length ? bits.join(', ') + '.' : '평범한 세기였어요.';
     const targetName = currentStageCfg().targetName;
     const verdict = success ? (targetName+'에 정확히 들어갔습니다!') : (targetName+'를 벗어났습니다. 값을 다시 노려보세요.');
     return cause + ' ' + verdict;
@@ -2358,7 +2652,7 @@
       li.className = 'world-item' + (r.success ? ' ok' : '');
       li.innerHTML =
         '<span class="swatch" style="background:'+r.color+'"></span>' +
-        '<span class="mono">세계 '+r.id+' ['+r.stage+'단계] · v0 '+r.v0.toFixed(1)+' f '+r.force.toFixed(1)+'</span>' +
+        '<span class="mono">세계 '+r.id+' ['+r.stage+'단계] · v0 '+r.v0.toFixed(1)+'</span>' +
         '<span class="tag '+(r.success?'ok':'no')+'">'+(r.success?'성공':'실패')+'</span>';
       worldListEl.appendChild(li);
     });
@@ -2390,7 +2684,7 @@
     shotCount++;
     shotCountEl.textContent = shotCount;
     const anySuccess = success || reachedZone2Directly || reachedZone3Directly;
-    const record = {id:worldSeq, stage, v0:captured.v0, force:captured.force, color:currentColor, legStartM, finalM, success: anySuccess};
+    const record = {id:worldSeq, stage, v0:captured.v0, color:currentColor, legStartM, finalM, success: anySuccess};
     runs.push(record);
     if(runs.length > MAX_WORLDS) runs.shift();
     renderWorldList();
@@ -2401,12 +2695,12 @@
     if(winsStage1){
       mode = 'resting';
       resultEl.className = 'result success';
-      resultEl.textContent = 'stage1: 운동의 구역 클리어!';
+      resultEl.textContent = 'stage1: 마찰의 구역 클리어!';
       mainBtn.disabled = true;
       mainBtn.textContent = '\u00A0';
       mainBtn.onclick = null;
       clearedStages.push(1);
-      showStageClearOverlay('stage1: 운동의 구역 클리어', 'stage2로 가기', startGameStage2);
+      showStageClearOverlay('stage1: 마찰의 구역 클리어', 'stage2로 가기', startGameStage2);
     } else if(advancesToStage3){
       mode = 'resting';
       resultEl.className = 'result success';
@@ -2423,31 +2717,22 @@
       mainBtn.textContent = '2단계로 자동 이동 중…';
       mainBtn.onclick = null;
       setTimeout(()=>{ if(mode === 'resting' && stage === 1) startZone2(); }, 900);
-    } else if(success && stage === 1 && gameStage === 2){
-      mode = 'resting';
-      resultEl.className = 'result success';
-      resultEl.textContent = '안전지대 1 도착! 곧바로 안전지대 2로 이동합니다…';
-      mainBtn.disabled = true;
-      mainBtn.textContent = '이동 중…';
-      mainBtn.onclick = null;
-      setTimeout(()=>{ if(mode === 'resting' && stage === 1) startS2Zone2(); }, 900);
-    } else if(success && stage === 2 && gameStage === 2){
-      mode = 'resting';
-      resultEl.className = 'result success';
-      resultEl.textContent = '안전지대 2 도착! 곧바로 안전지대 3으로 이동합니다…';
-      mainBtn.disabled = true;
-      mainBtn.textContent = '이동 중…';
-      mainBtn.onclick = null;
-      setTimeout(()=>{ if(mode === 'resting' && stage === 2) startS2Zone3(); }, 900);
     } else if(success && cfg.isLast && gameStage === 2){
       mode = 'resting';
       resultEl.className = 'result success';
-      resultEl.textContent = 'stage2: 충격량의 구역 클리어!';
+      resultEl.textContent = 'stage2: 충돌의 구역 클리어!';
       mainBtn.disabled = true;
       mainBtn.textContent = '\u00A0';
       mainBtn.onclick = null;
       clearedStages.push(2);
-      showStageClearOverlay('stage2: 충격량의 구역 클리어', '처음부터 시작', fullReset);
+      showStageClearOverlay('stage2: 충돌의 구역 클리어', '처음부터 시작', fullReset);
+    } else if(success && gameStage === 2 && !cfg.isLast){
+      mode = 'resting';
+      resultEl.className = 'result success';
+      resultEl.textContent = cfg.targetName + ' 도착! (다음 구간은 아직 준비 중입니다)';
+      mainBtn.disabled = true;
+      mainBtn.textContent = '대기 중';
+      mainBtn.onclick = null;
     } else if(success && cfg.isLast){
       mode = 'win';
       resultEl.className = 'result success';
@@ -2470,7 +2755,7 @@
       } else {
         mode = 'resting';
         resultEl.className = 'result fail';
-        resultEl.textContent = buildFeedback(captured.v0, captured.force, false) + ' 공은 그 자리에 멈춰 있습니다. 폭탄에 닿기 전까지는 계속 그대로예요.';
+        resultEl.textContent = buildFeedback(captured.v0, false) + ' 공은 그 자리에 멈춰 있습니다. 폭탄에 닿기 전까지는 계속 그대로예요.';
         mainBtn.disabled = true;
         mainBtn.textContent = '대기 중 (폭탄 주의)';
         mainBtn.onclick = null;
@@ -2545,7 +2830,7 @@
     updateGaugeLabelsForStage();
     rebuildTicks();
     hazardSoundState = {};
-    frictionLineEl.style.display = 'none';
+    frictionLineEl.style.display = 'inline';
     shotCountEl.textContent = shotCount;
     renderWorldList();
     hideGameOverOverlay();
@@ -2583,12 +2868,20 @@
         const els = gaugeEls(q.key);
         els.marker.style.left = (fraction*100)+'%';
       } else if(mode === 'flying'){
-        const prevBallM = ballM;
         ballM += flightV*dt;
         flightV = Math.max(0, flightV - flightDecel*dt);
 
-        if(gameStage === 2 && !sedativeCollected && prevBallM < SEDATIVE_M && ballM >= SEDATIVE_M){
-          collectSedative();
+        if(gameStage === 2 && stage === 1 && !collidedWithB){
+          const cfg = ACTIVE_ZONES[1];
+          const collideM = (cfg.targetLeftM + cfg.targetRightM) / 2;
+          if(ballM >= collideM){
+            ballM = collideM;
+            objectBActive = true;
+            objectBM = collideM + (ballR*2)/scalePx();
+            objectBV = flightV;
+            flightV = 0;
+            collidedWithB = true;
+          }
         }
 
         const outOfBoundsM = getLastZoneCfg().targetRightM + 5;
@@ -2603,10 +2896,17 @@
           finalizeGameOver();
         }
       }
+      if(objectBActive){
+        objectBM += objectBV*dt;
+        if(mToPx(objectBM) - ballR > W){
+          objectBActive = false;
+        }
+      }
     }
 
     const bomb = getBombState(now);
-    if(!gamePausedForItem && (mode === 'flying' || mode === 'resting') && isHazardHit(bomb)){
+    const ballShielded = gameStage === 2 && isCoveredByShield(ballM, now);
+    if(!gamePausedForItem && !ballShielded && (mode === 'flying' || mode === 'resting') && isHazardHit(bomb)){
       triggerGameOver();
     }
 
@@ -2618,14 +2918,17 @@
         if(b.type === 'missile'){
           if(b.active){
             b.missiles.forEach((m)=>{
-              if(m.progress >= MISSILE_FALL_FRAC && !prev.explodedSet.has(m.idx)){
-                playExplosionSound();
-                prev.explodedSet.add(m.idx);
+              const soundKey = m.cycleIndex+'-'+m.idx;
+              if(m.progress >= MISSILE_FALL_FRAC && !prev.explodedSet.has(soundKey)){
+                if(!m.absorbed) playExplosionSound();
+                prev.explodedSet.add(soundKey);
               }
             });
           } else {
             prev.explodedSet.clear();
           }
+        } else if(b.type === 'nukes' && b.simultaneous){
+          if(b.active && !prev.active) playNukeExplosionSound();
         } else if(b.active){
           const idxNow = (typeof b.idx === 'number') ? b.idx : 0;
           if(!prev.active || idxNow !== prev.idx){
@@ -2715,12 +3018,12 @@
       distanceOffsetM = 0;
       lastSafeDistanceM = 0;
       hazardSoundState = {};
-      frictionLineEl.style.display = 'none';
+      frictionLineEl.style.display = 'inline';
       updateGaugeLabelsForStage();
       rebuildTicks();
       bombOrigin = performance.now();
       startNewShot();
-      showStageBanner('stage1: 운동의 구역');
+      showStageBanner('stage1: 마찰의 구역');
     }
   }
 
