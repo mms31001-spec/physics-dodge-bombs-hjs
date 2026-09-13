@@ -15,22 +15,22 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Serif+KR:wght@500;600&display=swap" rel="stylesheet">
 <script>
-  // KakaoTalk's in-app browser often misreports the visible viewport height
-  // (its own chrome overlays part of 100vh). Detect it and expose the real
-  // usable height as a CSS variable, scoped so nothing else (desktop, PWA
-  // home-screen launch) is affected.
+  // Browser chrome (address bars, in-app browser headers, etc.) can eat into
+  // the space that CSS's 100vh assumes is available, which is exactly what
+  // "add to home screen" mode doesn't have to deal with. Measuring the real
+  // visible height in JS and exposing it as a CSS variable lets the game
+  // shrink to fit (keeping its aspect ratio) in ANY browser context, the
+  // same way it already fits perfectly once installed to the home screen.
   (function(){
-    if(/KAKAOTALK/i.test(navigator.userAgent)){
-      document.documentElement.classList.add('kakao-inapp');
-      function setKakaoVH(){
-        document.documentElement.style.setProperty('--kakao-vh', window.innerHeight + 'px');
-      }
-      setKakaoVH();
-      window.addEventListener('resize', setKakaoVH);
-      window.addEventListener('orientationchange', setKakaoVH);
+    function setRealVH(){
+      document.documentElement.style.setProperty('--real-vh', window.innerHeight + 'px');
     }
+    setRealVH();
+    window.addEventListener('resize', setRealVH);
+    window.addEventListener('orientationchange', setRealVH);
   })();
 </script>
+
 <style>
   :root{
     --paper:#F7F4EC;
@@ -81,16 +81,13 @@
   .stage-select.fade-out{opacity:0; pointer-events:none;}
   .stage-select.show{display:flex;}
   .stage-select-box{
-    width:min(100vw, calc(88vh * (720/420)));
+    width:min(100vw, calc(var(--real-vh, 100vh) * 0.88 * (720/420)));
     aspect-ratio:720/420;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     gap:0.8vh;
     padding:0.8vh 2vw;
     overflow-y:auto;
     box-sizing:border-box;
-  }
-  .kakao-inapp .stage-select-box{
-    width:min(100vw, calc(var(--kakao-vh, 100vh) * 0.88 * (720/420)));
   }
   .stage-select-heading{
     font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;
@@ -606,15 +603,12 @@
     .wrap{ max-width:none; width:auto; margin:0; }
     .layout{ gap:0; justify-items:center; }
     .stage{
-      width:min(100vw, calc(100vh * (720/420)));
+      width:min(100vw, calc(var(--real-vh, 100vh) * (720/420)));
       aspect-ratio:720/420;
       padding:0;
       border:none;
       border-radius:0;
       margin:0 auto;
-    }
-    .kakao-inapp .stage{
-      width:min(100vw, calc(var(--kakao-vh, 100vh) * (720/420)));
     }
   }
 
