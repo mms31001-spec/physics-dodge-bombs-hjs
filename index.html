@@ -776,7 +776,7 @@
           <button type="button" class="sound-btn" id="soundBtn" aria-label="사운드">🔈</button>
           <button type="button" class="back-btn" id="backToSelectBtn">돌아가기</button>
         </div>
-        <div class="mass-badge" id="massBadge"><span id="frictionLine" style="display:none;">마찰력=<b class="mono">4N</b><br></span>물체 질량=<b class="mono">2kg</b><br>눈금 한 칸=<b class="mono">1m</b></div>
+        <div class="mass-badge" id="massBadge"><span id="gravityLine" style="display:none;">중력가속도=<b class="mono">10m/s²</b><br></span><span id="frictionLine" style="display:none;">마찰력=<b class="mono">4N</b><br></span>물체 질량=<b class="mono">2kg</b><br>눈금 한 칸=<b class="mono">1m</b></div>
       </div>
       <div class="play-timer"><span id="playTimer">00:00</span> · <span id="playDistance">0.0 m</span></div>
       <div class="sedative-status" id="sedativeStatus">신경안정제 사용 중</div>
@@ -831,7 +831,11 @@
   const GROUND_HEIGHT_PX = (H/2) * (2/3);
   const mainLaneY = H - GROUND_HEIGHT_PX;
   const worldLaneYs = [180, 230, 280, 330];
-  const ballR = 8;
+  let ballR = 8; // recomputed every frame so the ball is always a fixed 0.7m square on screen
+  const BALL_SIZE_M = 0.7;
+  function updateBallR(){
+    ballR = (BALL_SIZE_M/2) * scalePx();
+  }
   const MASS = 2; // kg, fixed ball mass
   const GRAVITY_G = 10; // m/s^2
   const NORMAL_FORCE = MASS * GRAVITY_G; // N — balances gravity, net vertical force = 0
@@ -1130,6 +1134,7 @@
   const playTimerEl = document.getElementById('playTimer');
   const playDistanceEl = document.getElementById('playDistance');
   const frictionLineEl = document.getElementById('frictionLine');
+  const gravityLineEl = document.getElementById('gravityLine');
   function formatTime(ms){
     const totalSec = Math.max(0, Math.floor(ms/1000));
     const mm = Math.floor(totalSec/60);
@@ -1976,6 +1981,7 @@
     hideStageClearOverlay();
     showStageBanner('stage2: 충돌의 구역');
     frictionLineEl.style.display = 'none';
+    gravityLineEl.style.display = 'none';
   }
 
   function startGameStage3(){
@@ -1998,6 +2004,7 @@
     hideStageClearOverlay();
     showStageBanner('stage3: 언덕의 구역');
     frictionLineEl.style.display = 'none';
+    gravityLineEl.style.display = 'inline';
   }
 
   function fullReset(){
@@ -2030,6 +2037,7 @@
     rebuildTicks();
     hazardSoundState = {};
     frictionLineEl.style.display = 'inline';
+    gravityLineEl.style.display = 'none';
     shotCountEl.textContent = shotCount;
     renderWorldList();
     hideGameOverOverlay();
@@ -3182,6 +3190,54 @@
     ctx.fillText(label, midX-tw/2, y-10);
   }
 
+  function drawGroundSparks(cx, groundY, speed){
+    const now = performance.now();
+    const intensity = Math.min(1, speed/8); // faster = a few more sparks, but stays subtle
+    const n = 2 + Math.round(intensity*2);
+    for(let i=0;i<n;i++){
+      const seed = i*37.1 + Math.floor(now/55)*7.3;
+      const rndSkip = pseudoRand(seed);
+      const rndPos = pseudoRand(seed+5.9);
+      const rndAngle = pseudoRand(seed+1.7);
+      const rndLen = pseudoRand(seed+3.3);
+      if(rndSkip > 0.5 + intensity*0.15) continue;
+      const angle = -Math.PI/2 + (rndAngle-0.5)*Math.PI*0.8;
+      const len = 2.5 + rndLen*4.5;
+      const sx = cx + (rndPos-0.5)*ballR*1.9;
+      const sy = groundY - 1;
+      const ex = sx + Math.cos(angle)*len;
+      const ey = sy + Math.sin(angle)*len;
+      ctx.strokeStyle = rndLen > 0.5 ? '#FFE49A' : '#FFFFFF';
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.55 + rndAngle*0.4;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawAimArrow(cx, ballTopY){
+    const t = (performance.now()/1000) % 1;
+    const offset = 3*Math.sin(2*Math.PI*t); // down 3px, then up 3px, over a 1s cycle
+    const tipY = (ballTopY - 4) + offset; // at the lowest point (offset=+3) this sits exactly 1px above the ball
+    const headBase = 16; // width of the triangular head's flat side (equilateral)
+    const headHeight = headBase * Math.sqrt(3)/2;
+    const totalLen = 32;
+    const shaftW = headBase * 0.4; // narrower than the triangle's side
+    const baseY = tipY - headHeight;
+    const shaftTopY = tipY - totalLen;
+    ctx.fillStyle = '#E5383B';
+    ctx.beginPath();
+    ctx.moveTo(cx, tipY);
+    ctx.lineTo(cx-headBase/2, baseY);
+    ctx.lineTo(cx+headBase/2, baseY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillRect(cx-shaftW/2, shaftTopY, shaftW, baseY-shaftTopY);
+  }
+
   function drawLane(px1, px2, y, color, alpha, ballOnEnd){
     ctx.strokeStyle = color; ctx.globalAlpha = alpha; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(px1, y); ctx.lineTo(px2, y); ctx.stroke();
@@ -3336,6 +3392,9 @@
         ctx.strokeStyle = '#242220'; ctx.lineWidth = 1;
         ctx.strokeRect(-ballR, -ballR*2, ballR*2, ballR*2);
         ctx.restore();
+        if(mode === 'aiming' || mode === 'locked'){
+          drawAimArrow(ballPx, groundY3-ballR*2);
+        }
       } else if(mode === 'exploding'){
         const progress = Math.min(1, (performance.now()-explosionStart)/EXPLOSION_DURATION);
         drawExplosionAnim(ballPx, progress);
@@ -3344,11 +3403,15 @@
       }
     } else if(mode === 'flying' || mode === 'resting'){
       drawLane(startPx, ballPx, mainLaneY, currentColor, 1, true);
+      if(gameStage === 1 && mode === 'flying' && flightV > 0.1){
+        drawGroundSparks(ballPx, mainLaneY, flightV);
+      }
     } else if(mode === 'aiming' || mode === 'locked'){
       ctx.fillStyle = currentColor;
       ctx.fillRect(startPx-ballR, mainLaneY-ballR*2, ballR*2, ballR*2);
       ctx.strokeStyle = '#242220'; ctx.lineWidth = 1;
       ctx.strokeRect(startPx-ballR, mainLaneY-ballR*2, ballR*2, ballR*2);
+      drawAimArrow(startPx, mainLaneY-ballR*2);
     } else if(mode === 'exploding'){
       drawLane(startPx, ballPx, mainLaneY, currentColor, 0.4, false);
       const progress = Math.min(1, (performance.now()-explosionStart)/EXPLOSION_DURATION);
@@ -3592,7 +3655,7 @@
       mainBtn.textContent = '\u00A0';
       mainBtn.onclick = null;
       clearedStages.push(2);
-      showStageClearOverlay('stage2: 충돌의 구역 클리어', '처음부터 시작', fullReset);
+      showStageClearOverlay('stage2: 충돌의 구역 클리어', 'stage3으로 가기', startGameStage3);
     } else if(success && stage === 1 && gameStage === 2){
       mode = 'resting';
       resultEl.className = 'result success';
@@ -3714,6 +3777,7 @@
     rebuildTicks();
     hazardSoundState = {};
     frictionLineEl.style.display = 'inline';
+    gravityLineEl.style.display = 'none';
     shotCountEl.textContent = shotCount;
     renderWorldList();
     hideGameOverOverlay();
@@ -3741,6 +3805,7 @@
     if(lastFrameTime === null) lastFrameTime = now;
     const dt = Math.min((now-lastFrameTime)/1000, 0.032);
     lastFrameTime = now;
+    updateBallR();
 
     if(gameStage === 1 && sedativeCollected && !sedativeUsed && !gamePausedForItem){
       sedativeBtn.style.display = (mode === 'aiming') ? 'flex' : 'none';
@@ -3830,7 +3895,7 @@
           playWallImpactSound();
           setTimeout(()=>{
             clearedStages.push(2);
-            showStageClearOverlay('stage2: 충돌의 구역 클리어', '처음부터 시작', fullReset);
+            showStageClearOverlay('stage2: 충돌의 구역 클리어', 'stage3으로 가기', startGameStage3);
           }, 1000);
         }
 
@@ -4007,6 +4072,7 @@
       lastSafeDistanceM = 0;
       hazardSoundState = {};
       frictionLineEl.style.display = 'inline';
+      gravityLineEl.style.display = 'none';
       updateGaugeLabelsForStage();
       rebuildTicks();
       bombOrigin = performance.now();
