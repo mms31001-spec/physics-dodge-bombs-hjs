@@ -921,6 +921,7 @@
   let objectBSinkStart = 0;
   let pitFilled = false;
   let bombZoneTriggered = false;
+  let bombZoneTriggerTime = null;
   let collidedWithMud = false;
   let preMudCollisionV = 0;
   let deathElapsedMs = 0;
@@ -954,7 +955,7 @@
   const S2_ZONE1_RIGHT_M = S2_ZONE1_CENTER_M + S2_ZONE_WIDTH_M/2;
   const S2_PIT_M = S2_ZONE1_CENTER_M + 10; // where object B sinks in and becomes new ground
   const S2_MUD_M = S2_ZONE1_CENTER_M + 12; // stationary 2kg mud lump (object C)
-  const S2_ZONE2_CENTER_M = S2_ZONE1_CENTER_M + 20;
+  const S2_ZONE2_CENTER_M = 52;
   const S2_ZONE2_LEFT_M = S2_ZONE2_CENTER_M - S2_ZONE_WIDTH_M/2;
   const S2_ZONE2_RIGHT_M = S2_ZONE2_CENTER_M + S2_ZONE_WIDTH_M/2;
   const OBJECT_B_SINK_MS = 550;
@@ -974,7 +975,8 @@
     2: {
       targetLeftM: S2_ZONE2_LEFT_M,
       targetRightM: S2_ZONE2_RIGHT_M,
-      targetName: '안전지대 2'
+      targetName: '안전지대 2',
+      hazard: {type:'meteor', startM:33, endM:51, randomRangeFrac:1.0, missileDuration:0.9, minGapSec:0.08, maxGapSec:0.12}
     }
   };
   const STAGE2_VIEWS = {
@@ -1180,7 +1182,7 @@
   function currentHazardStartM(){
     const hz = currentStageCfg().hazard;
     if(!hz) return 0;
-    return (hz.type === 'sweep' || hz.type === 'area' || hz.type === 'missile') ? hz.startM : hz.baseM;
+    return (hz.type === 'sweep' || hz.type === 'area' || hz.type === 'missile' || hz.type === 'meteor') ? hz.startM : hz.baseM;
   }
 
   // ---- Stage2 zone1: invincible shield that cycles along [0, SHIELD_TRACK_LEN_M] ----
@@ -1740,6 +1742,7 @@
     objectBSinking = false;
     pitFilled = false;
     bombZoneTriggered = false;
+    bombZoneTriggerTime = null;
     updateGaugeLabelsForStage();
     rebuildTicks();
     startNewShot();
@@ -1766,6 +1769,7 @@
     objectBSinking = false;
     pitFilled = false;
     bombZoneTriggered = false;
+    bombZoneTriggerTime = null;
     if(sedativeBtn) sedativeBtn.style.display = 'none';
     if(sedativeStatusEl) sedativeStatusEl.classList.remove('show');
     gameStage = 1;
@@ -1853,6 +1857,31 @@
         i++;
       }
       return {type:'missile', active: missiles.length > 0, missiles, hz};
+    } else if(hz.type === 'meteor'){
+      if(!bombZoneTriggered || bombZoneTriggerTime === null){
+        return {type:'meteor', active:false, missiles:[], hz};
+      }
+      const totalElapsed = (now - bombZoneTriggerTime)/1000;
+      const marginFrac = (1 - hz.randomRangeFrac)/2;
+      const rangeStart = hz.startM + (hz.endM-hz.startM)*marginFrac;
+      const rangeLen = (hz.endM-hz.startM)*hz.randomRangeFrac;
+      const meteors = [];
+      let t = 0;
+      let i = 0;
+      while(t < totalElapsed + hz.missileDuration && i < 200000){
+        const localElapsed = totalElapsed - t;
+        if(localElapsed >= 0 && localElapsed < hz.missileDuration){
+          const rnd = pseudoRand(i*61.3 + 7.7);
+          const impactM = rangeStart + rnd*rangeLen;
+          const progress = localElapsed / hz.missileDuration;
+          const absorbed = (gameStage === 2) && isCoveredByShield(impactM, now);
+          meteors.push({impactM, progress, idx:i, absorbed, cycleIndex:i});
+        }
+        const gapRnd = pseudoRand(i*17.53 + 2.9);
+        t += hz.minGapSec + gapRnd*(hz.maxGapSec-hz.minGapSec);
+        i++;
+      }
+      return {type:'meteor', active: meteors.length > 0, missiles: meteors, hz};
     } else {
       const activeTotal = hz.count * hz.segDurationSec;
       const cycle = activeTotal + hz.pauseSec;
@@ -1887,7 +1916,7 @@
       if(bomb.type === 'area'){
         return ballM >= bomb.hz.startM && ballM <= bomb.hz.endM;
       }
-      if(bomb.type === 'missile'){
+      if(bomb.type === 'missile' || bomb.type === 'meteor'){
         if(ballM < bomb.hz.startM || ballM > bomb.hz.endM) return false;
         return bomb.missiles.some((m)=> !m.absorbed && m.progress >= MISSILE_FALL_FRAC && Math.abs(ballM - m.impactM) <= MISSILE_BLAST_RADIUS_M);
       }
@@ -2566,7 +2595,7 @@
         }
         ctx.restore();
       }
-    } else if(hz.type === 'missile'){
+    } else if(hz.type === 'missile' || hz.type === 'meteor'){
       if(bomb.active && bomb.missiles.length){
         const x1 = mToPx(hz.startM), x2 = mToPx(hz.endM);
         ctx.save();
@@ -2907,7 +2936,7 @@
         } else if(b.type === 'area'){
           const x1 = mapX(b.hz.startM), x2 = mapX(b.hz.endM);
           ctx.fillRect(x1, lineY-segH/2, Math.max(2,x2-x1), segH);
-        } else if(b.type === 'missile'){
+        } else if(b.type === 'missile' || b.type === 'meteor'){
           b.missiles.forEach((m)=>{
             if(!m.absorbed && m.progress >= MISSILE_FALL_FRAC){
               const mx = mapX(m.impactM);
@@ -3145,6 +3174,7 @@
     objectBSinking = false;
     pitFilled = false;
     bombZoneTriggered = false;
+    bombZoneTriggerTime = null;
     collidedWithMud = false;
     if(sedativeBtn) sedativeBtn.style.display = 'none';
     if(sedativeStatusEl) sedativeStatusEl.classList.remove('show');
@@ -3250,6 +3280,7 @@
             objectBSinking = false;
             pitFilled = true;
             bombZoneTriggered = true;
+            bombZoneTriggerTime = performance.now();
             if(mode === 'resting' && stage === 1 && gameStage === 2){
               startS2Zone2();
             }
@@ -3270,7 +3301,7 @@
         const b = bomb[key];
         if(!hazardSoundState[key]) hazardSoundState[key] = {active:false, idx:-1, explodedSet:new Set()};
         const prev = hazardSoundState[key];
-        if(b.type === 'missile'){
+        if(b.type === 'missile' || b.type === 'meteor'){
           if(b.active){
             b.missiles.forEach((m)=>{
               const soundKey = m.cycleIndex+'-'+m.idx;
