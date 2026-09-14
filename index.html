@@ -672,9 +672,9 @@
         <div class="stage-card-title">stage2: 충돌의 구역</div>
         <button type="button" class="stage-card-btn" data-stage="2">선택</button>
       </div>
-      <div class="stage-card disabled">
+      <div class="stage-card">
         <div class="stage-card-title">stage3: 언덕의 구역</div>
-        <span class="stage-card-pending">준비중</span>
+        <button type="button" class="stage-card-btn" data-stage="3">선택</button>
       </div>
       <div class="stage-card disabled">
         <div class="stage-card-title">stage4: 열의 구역</div>
@@ -743,7 +743,7 @@
       <div class="item-pickup-overlay" id="itemPickupOverlay">
         <div class="item-pickup-text">신경안정제를 획득하였습니다.</div>
         <div class="pill-icon"><span class="pill-half left"></span><span class="pill-half right"></span></div>
-        <p class="item-pickup-desc">조준바의 속도를 50% 감소시킨다.</p>
+        <p class="item-pickup-desc">사용 시 조준바의 속도 50% 감소</p>
         <button id="itemPickupConfirmBtn">확인</button>
       </div>
 
@@ -922,7 +922,11 @@
   let pitFilled = false;
   let bombZoneTriggered = false;
   let bombZoneTriggerTime = null;
+  let pinkShieldFadeStart = null;
   let collidedWithMud = false;
+  let collidedWithWall = false;
+  let s3Vx = 0;
+  let s3FallStartTime = null; // real timestamp when the ball's left edge left the cliff edge
   let preMudCollisionV = 0;
   let deathElapsedMs = 0;
 
@@ -953,17 +957,32 @@
   const S2_ZONE1_CENTER_M = 20;
   const S2_ZONE1_LEFT_M = S2_ZONE1_CENTER_M - S2_ZONE_WIDTH_M/2;
   const S2_ZONE1_RIGHT_M = S2_ZONE1_CENTER_M + S2_ZONE_WIDTH_M/2;
-  const S2_PIT_M = S2_ZONE1_CENTER_M + 10; // where object B sinks in and becomes new ground
-  const S2_MUD_M = S2_ZONE1_CENTER_M + 12; // stationary 2kg mud lump (object C)
-  const S2_ZONE2_CENTER_M = 52;
+  const S2_PIT_M = S2_ZONE1_CENTER_M + 8; // where object B sinks in and becomes new ground
+  const S2_MUD_M = S2_ZONE1_CENTER_M + 10; // stationary 2kg mud lump (object C)
+  const S2_ZONE2_CENTER_M = 50;
   const S2_ZONE2_LEFT_M = S2_ZONE2_CENTER_M - S2_ZONE_WIDTH_M/2;
   const S2_ZONE2_RIGHT_M = S2_ZONE2_CENTER_M + S2_ZONE_WIDTH_M/2;
+  const S2_WALL_LEFT_M = S2_ZONE2_RIGHT_M;
+  const S2_WALL_THICKNESS_M = 1;
+  const S2_WALL_HEIGHT_M = 3;
   const OBJECT_B_SINK_MS = 550;
 
   const SHIELD_LEN_M = 5;
   const SHIELD_SPEED_MPS = 4;
   const SHIELD_HEIGHT_M = 2;
   const SHIELD_TRACK_LEN_M = S2_ZONE1_CENTER_M; // shield cycles within [0, this]
+  const SHIELD2_SPEED_MPS = 5;
+  const SHIELD2_TRACK_START_M = S2_MUD_M;
+  const SHIELD2_TRACK_LEN_M = S2_ZONE2_CENTER_M - S2_MUD_M; // cycles within [mud, zone2 center]
+  const SHIELDS = [
+    { speed: SHIELD_SPEED_MPS, trackStart: 0, trackLen: SHIELD_TRACK_LEN_M, rgb: '120,205,255', edgeRgb: '190,235,255', height: SHIELD_HEIGHT_M },
+    { speed: SHIELD2_SPEED_MPS, trackStart: SHIELD2_TRACK_START_M, trackLen: SHIELD2_TRACK_LEN_M, rgb: '100,210,120', edgeRgb: '190,245,190', height: SHIELD_HEIGHT_M }
+  ];
+  const PINK_SHIELD_START_M = S2_MUD_M;
+  const PINK_SHIELD_END_M = S2_ZONE2_LEFT_M;
+  const PINK_SHIELD_HEIGHT_M = SHIELD_HEIGHT_M + 1.5; // sits higher than the moving shields
+  const PINK_SHIELD_RGB = '224,120,190';
+  const PINK_SHIELD_EDGE_RGB = '250,200,230';
 
   const STAGE2_ZONES = {
     1: {
@@ -976,7 +995,7 @@
       targetLeftM: S2_ZONE2_LEFT_M,
       targetRightM: S2_ZONE2_RIGHT_M,
       targetName: '안전지대 2',
-      hazard: {type:'meteor', startM:33, endM:51, randomRangeFrac:1.0, missileDuration:0.9, minGapSec:0.08, maxGapSec:0.12}
+      hazard: {type:'meteor', startM:31, endM:49, randomRangeFrac:1.0, missileDuration:0.9, minGapSec:0.08, maxGapSec:0.12}
     }
   };
   const STAGE2_VIEWS = {
@@ -987,12 +1006,94 @@
   const STAGE1_FRICTION_N = 4; // fixed friction force for stage 1 (all zones)
   const SEDATIVE_M = (ZONE1_RIGHT_M + ZONE2_LEFT_M) / 2; // item location, midpoint of stage1 zone1-2 gap
 
+  // ---- Stage 3: 언덕의 구역 — sloped terrain, energy conservation (frictionless) ----
+  const S3_FLAT0_LEN = 5;
+  const S3_HILL1_RUN = 10, S3_HILL1_RISE = 4.5;
+  const S3_FLAT1_LEN = 5;
+  const S3_CLIFF_DROP = 1;
+  const S3_FLAT2_LEN = 10;
+  const S3_HILL2_RUN = 3, S3_HILL2_RISE = 1.0;
+
+  const S3_X_HILL1_START = S3_FLAT0_LEN; // 5
+  const S3_X_HILL1_END = S3_X_HILL1_START + S3_HILL1_RUN; // 15
+  const S3_X_CLIFF = S3_X_HILL1_END + S3_FLAT1_LEN; // 20 — cliff face / wall (restitution 0), height 0.5m
+  const S3_X_FLAT2_END = S3_X_CLIFF + S3_FLAT2_LEN; // 25
+  const S3_X_HILL2_END = S3_X_FLAT2_END + S3_HILL2_RUN; // 28
+  const S3_HEIGHT_LOWER_PLATEAU = S3_HILL1_RISE - S3_CLIFF_DROP; // 4.0
+  const S3_HEIGHT_HILL2_TOP = S3_HEIGHT_LOWER_PLATEAU + S3_HILL2_RISE; // 5.5
+  const S3_WORLD_END_M = S3_X_HILL2_END + 12; // temporary boundary beyond hill2, until hazards are built
+
+  // cos(theta) for each sloped segment, used to convert along-slope speed to horizontal speed
+  const S3_HILL1_COS = S3_HILL1_RUN / Math.sqrt(S3_HILL1_RUN*S3_HILL1_RUN + S3_HILL1_RISE*S3_HILL1_RISE);
+  const S3_HILL2_COS = S3_HILL2_RUN / Math.sqrt(S3_HILL2_RUN*S3_HILL2_RUN + S3_HILL2_RISE*S3_HILL2_RISE);
+
+  function s3TerrainHeightM(xM){
+    if(xM <= S3_X_HILL1_START) return 0;
+    if(xM < S3_X_HILL1_END){
+      const t = (xM - S3_X_HILL1_START) / S3_HILL1_RUN;
+      return t * S3_HILL1_RISE;
+    }
+    if(xM < S3_X_CLIFF) return S3_HILL1_RISE;
+    if(xM < S3_X_FLAT2_END) return S3_HEIGHT_LOWER_PLATEAU;
+    if(xM < S3_X_HILL2_END){
+      const t = (xM - S3_X_FLAT2_END) / S3_HILL2_RUN;
+      return S3_HEIGHT_LOWER_PLATEAU + t*S3_HILL2_RISE;
+    }
+    return S3_HEIGHT_HILL2_TOP;
+  }
+
+  // horizontal component of gravity-conservation speed at position xM (magnitude only, direction applied by caller)
+  function s3HorizSpeedAt(xM, v0){
+    const h = s3TerrainHeightM(xM);
+    const sAlong = Math.sqrt(Math.max(0, v0*v0 - 2*GRAVITY_G*h));
+    let cosT = 1;
+    if(xM > S3_X_HILL1_START && xM < S3_X_HILL1_END) cosT = S3_HILL1_COS;
+    else if(xM > S3_X_FLAT2_END && xM < S3_X_HILL2_END) cosT = S3_HILL2_COS;
+    return sAlong * cosT;
+  }
+
+  const S3_HILL1_SINCOS = (S3_HILL1_RISE/Math.sqrt(S3_HILL1_RUN*S3_HILL1_RUN+S3_HILL1_RISE*S3_HILL1_RISE)) * S3_HILL1_COS;
+  const S3_HILL2_SINCOS = (S3_HILL2_RISE/Math.sqrt(S3_HILL2_RUN*S3_HILL2_RUN+S3_HILL2_RISE*S3_HILL2_RISE)) * S3_HILL2_COS;
+  // horizontal component of gravitational acceleration at xM (always points downhill / toward -x on both inclines; 0 on flat ground)
+  function s3AccelAt(xM){
+    if(xM > S3_X_HILL1_START && xM < S3_X_HILL1_END) return -GRAVITY_G * S3_HILL1_SINCOS;
+    if(xM > S3_X_FLAT2_END && xM < S3_X_HILL2_END) return -GRAVITY_G * S3_HILL2_SINCOS;
+    return 0;
+  }
+  // cos(theta) of the slope at xM (1 on flat ground) — used to rescale the tracked
+  // horizontal velocity when crossing into/out of an incline, so the TRUE speed
+  // (not just its horizontal component) stays continuous and energy is conserved.
+  function s3CosThetaAt(xM){
+    if(xM > S3_X_HILL1_START && xM < S3_X_HILL1_END) return S3_HILL1_COS;
+    if(xM > S3_X_FLAT2_END && xM < S3_X_HILL2_END) return S3_HILL2_COS;
+    return 1;
+  }
+  // rotation angle (canvas radians) so a box's bottom edge lies flush against the local slope
+  function s3SlopeAngleAt(xM){
+    if(xM > S3_X_HILL1_START && xM < S3_X_HILL1_END) return -Math.atan2(S3_HILL1_RISE, S3_HILL1_RUN);
+    if(xM > S3_X_FLAT2_END && xM < S3_X_HILL2_END) return -Math.atan2(S3_HILL2_RISE, S3_HILL2_RUN);
+    return 0;
+  }
+
   const QUANTITIES_STAGE1 = [
     {key:'v0', label:'초기속도 v0', min:0, max:20, step:5, decimals:2, speed:1/3, unit:'m/s'}
   ];
   const QUANTITIES_STAGE2 = [
     {key:'v0', label:'초기속도 v0', min:0, max:20, step:5, decimals:2, speed:1/3, unit:'m/s'}
   ];
+  const QUANTITIES_STAGE3 = [
+    {key:'v0', label:'초기속도 v0', min:0, max:20, step:5, decimals:2, speed:1/3, unit:'m/s'}
+  ];
+
+  const STAGE3_ZONES = {
+    1: {
+      targetLeftM: S3_X_CLIFF, targetRightM: S3_X_FLAT2_END, targetName: '안전지대',
+      hazard: {type:'segments', baseM:1, segLenM:14/10, count:10, segDurationSec:0.25, pauseSec:1.2}
+    }
+  };
+  const STAGE3_VIEWS = {
+    1: { startM: 0, spanM: S3_WORLD_END_M + 3 }
+  };
 
   let gameStage = 1;
   let ACTIVE_ZONES = STAGE1_ZONES;
@@ -1122,6 +1223,7 @@
   sedativeBtn.addEventListener('click', (e)=>{
     e.preventDefault();
     e.stopPropagation();
+    if(mode !== 'aiming') return;
     pauseForItem();
     sedativeConfirmOverlay.classList.add('show');
   });
@@ -1185,24 +1287,54 @@
     return (hz.type === 'sweep' || hz.type === 'area' || hz.type === 'missile' || hz.type === 'meteor') ? hz.startM : hz.baseM;
   }
 
-  // ---- Stage2 zone1: invincible shield that cycles along [0, SHIELD_TRACK_LEN_M] ----
-  function getShieldBands(now){
+  // ---- Stage2: invincible shields that cycle along their own track ----
+  function getShieldBandsForConfig(now, cfg){
     const elapsed = Math.max(0, (now - bombOrigin)/1000);
-    const s = SHIELD_SPEED_MPS * elapsed;
-    const front = s % SHIELD_TRACK_LEN_M;
+    const s = cfg.speed * elapsed;
+    const front = s % cfg.trackLen;
     if(front >= SHIELD_LEN_M){
-      return [{startM: front - SHIELD_LEN_M, endM: front}];
+      return [{startM: cfg.trackStart + front - SHIELD_LEN_M, endM: cfg.trackStart + front}];
     }
-    const bands = [{startM: 0, endM: front}];
-    const wrapStart = SHIELD_TRACK_LEN_M - (SHIELD_LEN_M - front);
-    if(wrapStart < SHIELD_TRACK_LEN_M){
-      bands.push({startM: wrapStart, endM: SHIELD_TRACK_LEN_M});
+    const bands = [{startM: cfg.trackStart, endM: cfg.trackStart + front}];
+    const wrapStart = cfg.trackLen - (SHIELD_LEN_M - front);
+    if(wrapStart < cfg.trackLen){
+      bands.push({startM: cfg.trackStart + wrapStart, endM: cfg.trackStart + cfg.trackLen});
     }
     return bands;
   }
 
+  function getAllShieldBands(now){
+    const all = [];
+    SHIELDS.forEach((cfg)=>{
+      getShieldBandsForConfig(now, cfg).forEach((b)=>{
+        all.push({startM: b.startM, endM: b.endM, rgb: cfg.rgb, edgeRgb: cfg.edgeRgb, height: cfg.height});
+      });
+    });
+    if(!bombZoneTriggered){
+      all.push({startM: PINK_SHIELD_START_M, endM: PINK_SHIELD_END_M, rgb: PINK_SHIELD_RGB, edgeRgb: PINK_SHIELD_EDGE_RGB, height: PINK_SHIELD_HEIGHT_M});
+    }
+    return all;
+  }
+
+  const PINK_SHIELD_FADE_MS = 1000;
+  function getVisualShieldBands(now){
+    const all = getAllShieldBands(now);
+    if(bombZoneTriggered && pinkShieldFadeStart !== null){
+      const fadeAlpha = 1 - (now - pinkShieldFadeStart) / PINK_SHIELD_FADE_MS;
+      if(fadeAlpha > 0){
+        all.push({startM: PINK_SHIELD_START_M, endM: PINK_SHIELD_END_M, rgb: PINK_SHIELD_RGB, edgeRgb: PINK_SHIELD_EDGE_RGB, height: PINK_SHIELD_HEIGHT_M, fadeAlpha});
+      }
+    }
+    return all;
+  }
+
   function isCoveredByShield(m, now){
-    return getShieldBands(now).some((b)=> m >= b.startM && m <= b.endM);
+    return getAllShieldBands(now).some((b)=> m >= b.startM && m <= b.endM);
+  }
+
+  function getShieldHeightAt(m, now){
+    const band = getAllShieldBands(now).find((b)=> m >= b.startM && m <= b.endM);
+    return band ? band.height : SHIELD_HEIGHT_M;
   }
 
   function updateDistanceDisplay(){
@@ -1336,7 +1468,12 @@
     mainBtn.textContent = '샷 진행 중…';
     mainBtn.onclick = null;
     resultEl.className = 'result';
-    if(gameStage === 2){
+    if(gameStage === 3){
+      flightV = captured.v0;
+      s3Vx = captured.v0;
+      flightDecel = 0;
+      resultEl.textContent = 'v0 '+captured.v0.toFixed(2)+' m/s — 언덕을 오르는 중…';
+    } else if(gameStage === 2){
       flightV = captured.v0;
       flightDecel = 0;
       resultEl.textContent = 'v0 '+captured.v0.toFixed(1)+' m/s — 등속으로 이동 중…';
@@ -1497,6 +1634,93 @@
     noiseFilter.frequency.value = 1100;
     const noiseGain = audioCtx.createGain();
     noiseGain.gain.setValueAtTime(0.4, t0);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(masterGain);
+    noise.start(t0);
+  }
+
+  function playShieldFadeSound(){
+    if(!audioCtx || !masterGain) return;
+    const t0 = audioCtx.currentTime;
+    const dur = 1.0;
+
+    // descending "power failing" tone, like a force field losing charge
+    const osc = audioCtx.createOscillator();
+    const oscGain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(520, t0);
+    osc.frequency.exponentialRampToValueAtTime(90, t0 + dur);
+    const oscFilter = audioCtx.createBiquadFilter();
+    oscFilter.type = 'lowpass';
+    oscFilter.frequency.setValueAtTime(2200, t0);
+    oscFilter.frequency.exponentialRampToValueAtTime(300, t0 + dur);
+    oscGain.gain.setValueAtTime(0.001, t0);
+    oscGain.gain.exponentialRampToValueAtTime(0.22, t0 + 0.08);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    osc.connect(oscFilter);
+    oscFilter.connect(oscGain);
+    oscGain.connect(masterGain);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.05);
+
+    // faint electrical crackle/fizzle riding on top
+    const bufferSize = Math.max(1, Math.floor(audioCtx.sampleRate * dur));
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<bufferSize;i++){
+      const envelope = 1 - i/bufferSize;
+      data[i] = (Math.random()*2-1) * envelope * (Math.random() < 0.15 ? 1 : 0.15);
+    }
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    const noiseFilter = audioCtx.createBiquadFilter();
+    noiseFilter.type = 'highpass';
+    noiseFilter.frequency.value = 1800;
+    const noiseGain = audioCtx.createGain();
+    noiseGain.gain.setValueAtTime(0.18, t0);
+    noiseGain.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(masterGain);
+    noise.start(t0);
+  }
+
+  function playWallImpactSound(){
+    if(!audioCtx || !masterGain) return;
+    const t0 = audioCtx.currentTime;
+
+    // solid low thud, like a rigid mass slamming into an immovable wall
+    const osc = audioCtx.createOscillator();
+    const oscGain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(150, t0);
+    osc.frequency.exponentialRampToValueAtTime(45, t0 + 0.16);
+    oscGain.gain.setValueAtTime(0.0001, t0);
+    oscGain.gain.exponentialRampToValueAtTime(0.7, t0 + 0.01);
+    oscGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
+    osc.connect(oscGain);
+    oscGain.connect(masterGain);
+    osc.start(t0);
+    osc.stop(t0 + 0.4);
+
+    // sharp knock transient
+    const dur = 0.08;
+    const bufferSize = Math.max(1, Math.floor(audioCtx.sampleRate * dur));
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<bufferSize;i++){
+      data[i] = (Math.random()*2-1) * (1 - i/bufferSize);
+    }
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    const noiseFilter = audioCtx.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.value = 700;
+    noiseFilter.Q.value = 0.8;
+    const noiseGain = audioCtx.createGain();
+    noiseGain.gain.setValueAtTime(0.5, t0);
     noiseGain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
     noise.connect(noiseFilter);
     noiseFilter.connect(noiseGain);
@@ -1693,6 +1917,8 @@
     gaugeSpeedMultiplier = 1;
     collidedWithB = false;
     collidedWithMud = false;
+    collidedWithWall = false;
+    s3FallStartTime = null;
     sedativeStatusEl.classList.remove('show');
     hideFoulOverlay();
     mainBtn.disabled = false;
@@ -1743,11 +1969,34 @@
     pitFilled = false;
     bombZoneTriggered = false;
     bombZoneTriggerTime = null;
+    pinkShieldFadeStart = null;
     updateGaugeLabelsForStage();
     rebuildTicks();
     startNewShot();
     hideStageClearOverlay();
     showStageBanner('stage2: 충돌의 구역');
+    frictionLineEl.style.display = 'none';
+  }
+
+  function startGameStage3(){
+    distanceOffsetM += ballM;
+    gameStage = 3;
+    ACTIVE_ZONES = STAGE3_ZONES;
+    ACTIVE_VIEWS = STAGE3_VIEWS;
+    QUANTITIES = QUANTITIES_STAGE3;
+    stage = 1;
+    legStartM = 0;
+    ballM = 0;
+    s3Vx = 0;
+    collidedWithWall = false;
+    s3FallStartTime = null;
+    bombOrigin = performance.now();
+    hazardSoundState = {};
+    updateGaugeLabelsForStage();
+    rebuildTicks();
+    startNewShot();
+    hideStageClearOverlay();
+    showStageBanner('stage3: 언덕의 구역');
     frictionLineEl.style.display = 'none';
   }
 
@@ -1770,6 +2019,7 @@
     pitFilled = false;
     bombZoneTriggered = false;
     bombZoneTriggerTime = null;
+    pinkShieldFadeStart = null;
     if(sedativeBtn) sedativeBtn.style.display = 'none';
     if(sedativeStatusEl) sedativeStatusEl.classList.remove('show');
     gameStage = 1;
@@ -1850,7 +2100,8 @@
           const impactM = rangeStart + rnd*rangeLen;
           const progress = localElapsed / hz.missileDuration;
           const absorbed = (gameStage === 2) && isCoveredByShield(impactM, now);
-          missiles.push({impactM, progress, idx:i, absorbed, cycleIndex:i});
+          const stopHeightM = absorbed ? getShieldHeightAt(impactM, now) : SHIELD_HEIGHT_M;
+          missiles.push({impactM, progress, idx:i, absorbed, stopHeightM, cycleIndex:i});
         }
         const gapRnd = pseudoRand(i*13.37 + 1.1);
         t += hz.minGapSec + gapRnd*(hz.maxGapSec-hz.minGapSec);
@@ -1858,10 +2109,7 @@
       }
       return {type:'missile', active: missiles.length > 0, missiles, hz};
     } else if(hz.type === 'meteor'){
-      if(!bombZoneTriggered || bombZoneTriggerTime === null){
-        return {type:'meteor', active:false, missiles:[], hz};
-      }
-      const totalElapsed = (now - bombZoneTriggerTime)/1000;
+      const totalElapsed = Math.max(0, (now - bombOrigin)/1000);
       const marginFrac = (1 - hz.randomRangeFrac)/2;
       const rangeStart = hz.startM + (hz.endM-hz.startM)*marginFrac;
       const rangeLen = (hz.endM-hz.startM)*hz.randomRangeFrac;
@@ -1875,7 +2123,8 @@
           const impactM = rangeStart + rnd*rangeLen;
           const progress = localElapsed / hz.missileDuration;
           const absorbed = (gameStage === 2) && isCoveredByShield(impactM, now);
-          meteors.push({impactM, progress, idx:i, absorbed, cycleIndex:i});
+          const stopHeightM = absorbed ? getShieldHeightAt(impactM, now) : SHIELD_HEIGHT_M;
+          meteors.push({impactM, progress, idx:i, absorbed, stopHeightM, cycleIndex:i});
         }
         const gapRnd = pseudoRand(i*17.53 + 2.9);
         t += hz.minGapSec + gapRnd*(hz.maxGapSec-hz.minGapSec);
@@ -1930,6 +2179,136 @@
 
   function isHazardHit(bombState){
     return Object.keys(bombState).some((key)=> isBombHit(bombState[key]));
+  }
+
+  function groundYAtM(xM){
+    return mainLaneY - s3TerrainHeightM(xM)*scalePx();
+  }
+
+  // Ground height to draw the ball at: normally just the terrain height under its
+  // center, but right at the cliff we hold it on the upper plateau until its
+  // LEADING (left) edge has actually crossed the drop, so it visibly grazes the
+  // edge with that edge instead of appearing to fall a half-body-width early.
+  function s3BallGroundY(xM){
+    const r = ballR/scalePx();
+    const leftEdge = xM - r;
+    if(!collidedWithWall && leftEdge < S3_X_CLIFF && xM >= S3_X_CLIFF){
+      return groundYAtM(S3_X_CLIFF - 0.001);
+    }
+    if(s3FallStartTime !== null && xM >= S3_X_CLIFF && xM < S3_X_FLAT2_END){
+      // real projectile motion: horizontal speed unchanged (already handled by the
+      // physics update), vertical position free-falls from the ledge height;
+      // clamped at the lower plateau — restitution 0, it simply stops, no bounce
+      const elapsed = (performance.now() - s3FallStartTime) / 1000;
+      const fallHeight = Math.max(S3_HEIGHT_LOWER_PLATEAU, S3_HILL1_RISE - 0.5*GRAVITY_G*elapsed*elapsed);
+      return mainLaneY - fallHeight*scalePx();
+    }
+    return groundYAtM(xM);
+  }
+
+  function drawGrid3(){
+    ctx.fillStyle = '#F7F4EC';
+    ctx.fillRect(0,0,W,H);
+
+    const step = scalePx();
+    const viewStart = currentViewStartM();
+    const firstM = Math.floor(viewStart - MARGIN/step);
+    const lastM = Math.ceil(viewStart + (W-MARGIN)/step) + 1;
+
+    // underground fill: everything at or below ground level (h=0)
+    ctx.fillStyle = '#6B4F36';
+    ctx.fillRect(0, mainLaneY, W, H-mainLaneY);
+
+    // hill fill: the terrain mass that rises above ground level, a different color
+    // from the underground so "the hill sitting on top of the ground" reads clearly.
+    // Built from the terrain's exact breakpoints (not sampled) so every straight
+    // segment — including the vertical cliff face — renders with no interpolation
+    // artifacts.
+    ctx.fillStyle = '#8A6B4A';
+    ctx.beginPath();
+    ctx.moveTo(mToPx(firstM), groundYAtM(firstM));
+    const s3Breakpoints = [S3_X_HILL1_START, S3_X_HILL1_END, S3_X_CLIFF, S3_X_FLAT2_END, S3_X_HILL2_END];
+    s3Breakpoints.forEach((bp)=>{
+      if(bp <= firstM || bp >= lastM) return;
+      if(bp === S3_X_CLIFF){
+        const cx = mToPx(bp);
+        ctx.lineTo(cx, groundYAtM(bp - 0.001));
+        ctx.lineTo(cx, groundYAtM(bp + 0.001));
+      } else {
+        ctx.lineTo(mToPx(bp), groundYAtM(bp));
+      }
+    });
+    ctx.lineTo(mToPx(lastM), groundYAtM(lastM));
+    ctx.lineTo(mToPx(lastM), mainLaneY);
+    ctx.lineTo(mToPx(firstM), mainLaneY);
+    ctx.closePath();
+    ctx.fill();
+
+    // cliff face (the restitution-0 wall), drawn as a distinct darker vertical stripe
+    const cliffX = mToPx(S3_X_CLIFF);
+    const cliffTopY = groundYAtM(S3_X_CLIFF - 0.001);
+    const cliffBotY = groundYAtM(S3_X_CLIFF + 0.001);
+    ctx.fillStyle = '#5C4630';
+    ctx.fillRect(cliffX-1.5, cliffTopY, 3, cliffBotY-cliffTopY);
+
+    // vertical grid lines
+    ctx.strokeStyle = '#DDD6C3';
+    ctx.lineWidth = 1;
+    for(let m=firstM; m<=lastM; m++){
+      const x = mToPx(m);
+      if(x < -2 || x > W+2) continue;
+      const gy = groundYAtM(m);
+      ctx.beginPath(); ctx.moveTo(x+0.5,0); ctx.lineTo(x+0.5,gy); ctx.stroke();
+    }
+    // horizontal grid lines, phased so one of them lands exactly on ground level (h=0)
+    const yPhase = ((mainLaneY % step) + step) % step;
+    for(let y=yPhase; y<=H; y+=step){
+      ctx.beginPath(); ctx.moveTo(0,y+0.5); ctx.lineTo(W,y+0.5); ctx.stroke();
+    }
+
+    // height-above-ground vertical arrows for each flat segment
+    const heightLabels = [
+      { m: (0 + S3_X_HILL1_START)/2, h: 0 },
+      { m: (S3_X_HILL1_END + S3_X_CLIFF)/2, h: S3_HILL1_RISE },
+      { m: (S3_X_CLIFF + S3_X_FLAT2_END)/2, h: S3_HEIGHT_LOWER_PLATEAU },
+      { m: (S3_X_HILL2_END + S3_WORLD_END_M)/2, h: S3_HEIGHT_HILL2_TOP }
+    ];
+    heightLabels.forEach((lb)=>{
+      if(lb.h <= 0) return; // nothing to measure at ground level
+      const x = mToPx(lb.m);
+      if(x < -20 || x > W+20) return;
+      const yTop = groundYAtM(lb.m);
+      const yBottom = mainLaneY;
+      if(yBottom - yTop < 6) return; // too short to draw meaningfully
+
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(x, yTop);
+      ctx.lineTo(x, yBottom);
+      ctx.stroke();
+      // arrowheads at both ends
+      const ah = 8;
+      ctx.beginPath();
+      ctx.moveTo(x, yTop); ctx.lineTo(x-ah*0.6, yTop+ah); ctx.lineTo(x+ah*0.6, yTop+ah);
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x, yBottom); ctx.lineTo(x-ah*0.6, yBottom-ah); ctx.lineTo(x+ah*0.6, yBottom-ah);
+      ctx.closePath(); ctx.fill();
+
+      // height label at the midpoint, with a small background so it stays readable over the arrow
+      const midY = (yTop+yBottom)/2;
+      const label = lb.h.toFixed(1)+'m';
+      ctx.font = '800 14px -apple-system, sans-serif';
+      const tw = ctx.measureText(label).width;
+      ctx.fillStyle = '#F7F4EC';
+      ctx.fillRect(x-tw/2-3.5, midY-9, tw+7, 17);
+      ctx.fillStyle = '#4A3A2A';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, x, midY+5);
+      ctx.textAlign = 'left';
+    });
   }
 
   function drawGrid(){
@@ -2342,6 +2721,79 @@
     ctx.restore();
   }
 
+  function drawMeteorFall(cx, groundY, fallProgress, seed, stopY){
+    const scale = scalePx();
+    const now = performance.now();
+    const targetY = (typeof stopY === 'number') ? stopY : groundY;
+
+    // pulsing warning reticle, amber-toned to read as "impact zone" rather than a missile target
+    const pulse = 0.65 + 0.35*Math.sin(now/140 + seed);
+    ctx.strokeStyle = 'rgba(224,120,30,'+(0.35+0.3*pulse)+')';
+    ctx.setLineDash([4,4]);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(cx, targetY, MISSILE_BLAST_RADIUS_M*scale*(0.5+0.15*pulse), 6*(0.5+0.15*pulse), 0, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // falls with a gravity-like ease-in, stopping at its actual target height
+    const eased = fallProgress*fallProgress;
+    const startY = 4;
+    const endY = targetY - scale*0.12;
+    const my = startY + (endY-startY)*eased;
+    const wobble = Math.sin(seed + fallProgress*2)*1.2;
+    const mx = cx + wobble;
+    const spin = seed*3 + fallProgress*9;
+
+    const bodyR = Math.max(5, scale*0.16);
+
+    // fiery trail (warm gradient, distinct from the missile's cool smoke trail)
+    const trailLen = bodyR*5.5;
+    const trailGrad = ctx.createLinearGradient(mx, my-trailLen, mx, my-bodyR*0.2);
+    trailGrad.addColorStop(0, 'rgba(255,150,40,0)');
+    trailGrad.addColorStop(0.5, 'rgba(255,140,30,0.35)');
+    trailGrad.addColorStop(1, 'rgba(255,200,90,0.85)');
+    ctx.strokeStyle = trailGrad;
+    ctx.lineWidth = Math.max(3, bodyR*0.9);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(mx - wobble*0.6, my-trailLen);
+    ctx.quadraticCurveTo(mx, my-trailLen*0.4, mx, my-bodyR*0.2);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // outer glow
+    const glow = ctx.createRadialGradient(mx, my, 0, mx, my, bodyR*2.2);
+    glow.addColorStop(0, 'rgba(255,190,90,0.55)');
+    glow.addColorStop(1, 'rgba(255,190,90,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(mx, my, bodyR*2.2, 0, Math.PI*2); ctx.fill();
+
+    // rocky body: irregular dark rock with glowing molten cracks
+    ctx.save();
+    ctx.translate(mx, my);
+    ctx.rotate(spin);
+    ctx.fillStyle = '#4A3B32';
+    ctx.beginPath();
+    ctx.moveTo(bodyR*0.9, 0);
+    ctx.lineTo(bodyR*0.35, bodyR*0.85);
+    ctx.lineTo(-bodyR*0.55, bodyR*0.65);
+    ctx.lineTo(-bodyR*0.9, -bodyR*0.15);
+    ctx.lineTo(-bodyR*0.25, -bodyR*0.9);
+    ctx.lineTo(bodyR*0.6, -bodyR*0.6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,140,40,0.9)';
+    ctx.beginPath();
+    ctx.moveTo(bodyR*0.5, -bodyR*0.1);
+    ctx.lineTo(0, bodyR*0.45);
+    ctx.lineTo(-bodyR*0.3, bodyR*0.05);
+    ctx.lineTo(bodyR*0.1, -bodyR*0.35);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
   function drawAirstrikeExplosion(cx, groundY, progress, seed){
     const scale = scalePx();
     const maxR = MISSILE_BLAST_RADIUS_M * scale;
@@ -2388,9 +2840,9 @@
     ctx.globalAlpha = 1;
   }
 
-  function drawShieldAbsorb(cx, groundY, progress){
+  function drawShieldAbsorb(cx, groundY, progress, heightM){
     const scale = scalePx();
-    const shieldY = groundY - SHIELD_HEIGHT_M*scale;
+    const shieldY = groundY - (typeof heightM === 'number' ? heightM : SHIELD_HEIGHT_M)*scale;
     const fade = Math.max(0, 1 - progress/0.6);
     if(fade <= 0) return;
     const r = scale*0.5*(0.4+0.8*Math.min(1,progress/0.3));
@@ -2416,21 +2868,24 @@
     const now = (typeof nowTs === 'number') ? nowTs : performance.now();
     const scale = scalePx();
     const groundY = mainLaneY;
-    const shieldY = groundY - SHIELD_HEIGHT_M*scale;
-    const bands = getShieldBands(now);
+    const bands = getVisualShieldBands(now);
     const t = now/1000;
     ctx.save();
     bands.forEach((b)=>{
       const x1 = mToPx(b.startM), x2 = mToPx(b.endM);
       if(x2 <= x1) return;
+      const shieldY = groundY - (b.height||SHIELD_HEIGHT_M)*scale;
       const h = scale*0.55;
+      const rgb = b.rgb, edgeRgb = b.edgeRgb;
+      const fadeAlpha = (typeof b.fadeAlpha === 'number') ? b.fadeAlpha : 1;
+      ctx.globalAlpha = fadeAlpha;
       const grad = ctx.createLinearGradient(0, shieldY-h/2, 0, shieldY+h/2);
-      grad.addColorStop(0, 'rgba(140,215,255,0.12)');
-      grad.addColorStop(0.5, 'rgba(120,205,255,0.42)');
-      grad.addColorStop(1, 'rgba(140,215,255,0.12)');
+      grad.addColorStop(0, 'rgba('+rgb+',0.12)');
+      grad.addColorStop(0.5, 'rgba('+rgb+',0.42)');
+      grad.addColorStop(1, 'rgba('+rgb+',0.12)');
       ctx.fillStyle = grad;
       ctx.fillRect(x1, shieldY-h/2, x2-x1, h);
-      ctx.strokeStyle = 'rgba(190,235,255,0.85)';
+      ctx.strokeStyle = 'rgba('+edgeRgb+',0.85)';
       ctx.lineWidth = 2;
       ctx.strokeRect(x1, shieldY-h/2, x2-x1, h);
       // soft shimmer sweep
@@ -2442,12 +2897,40 @@
       ctx.fillStyle = shimmerGrad;
       ctx.fillRect(Math.max(x1,shimmerX-10), shieldY-h/2, Math.min(20, x2-Math.max(x1,shimmerX-10)), h);
       // support struts down to the ground
-      ctx.strokeStyle = 'rgba(120,205,255,0.3)';
+      ctx.strokeStyle = 'rgba('+rgb+',0.3)';
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(x1, shieldY+h/2); ctx.lineTo(x1, groundY); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(x2, shieldY+h/2); ctx.lineTo(x2, groundY); ctx.stroke();
     });
     ctx.restore();
+  }
+
+  function drawWall(){
+    const scale = scalePx();
+    const x1 = mToPx(S2_WALL_LEFT_M);
+    const x2 = mToPx(S2_WALL_LEFT_M + S2_WALL_THICKNESS_M);
+    if(x2 < -10 || x1 > W+10) return;
+    const wallH = S2_WALL_HEIGHT_M*scale;
+    const topY = mainLaneY - wallH;
+    const grad = ctx.createLinearGradient(x1, 0, x2, 0);
+    grad.addColorStop(0, '#1F7A4E');
+    grad.addColorStop(0.5, '#2E9E63');
+    grad.addColorStop(1, '#1A6B44');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x1, topY, x2-x1, wallH);
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x1+0.5, topY+0.5, (x2-x1)-1, wallH-1);
+    // brick-like texture lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    const rows = Math.max(2, Math.round(wallH/12));
+    for(let r=1;r<rows;r++){
+      const ly = topY + (wallH*r/rows);
+      ctx.beginPath(); ctx.moveTo(x1, ly); ctx.lineTo(x2, ly); ctx.stroke();
+    }
+    // top highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillRect(x1, topY, x2-x1, 3);
   }
 
   function drawPit(){
@@ -2466,6 +2949,18 @@
     ctx.beginPath(); ctx.moveTo(x2-0.5, mainLaneY); ctx.lineTo(x2-0.5, mainLaneY+depth); ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,0.15)';
     ctx.beginPath(); ctx.moveTo(x1, mainLaneY+0.5); ctx.lineTo(x2, mainLaneY+0.5); ctx.stroke();
+
+    // small red button on the pit floor, waiting to be pressed by object B
+    const btnR = Math.max(2.5, ballR*0.28);
+    const btnY = mainLaneY + depth - btnR*1.3;
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(cx, btnY+btnR*0.5, btnR*1.3, btnR*0.5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#8A2E2E';
+    ctx.beginPath(); ctx.arc(cx, btnY, btnR*1.15, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#D8453F';
+    ctx.beginPath(); ctx.arc(cx, btnY-btnR*0.15, btnR, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.beginPath(); ctx.arc(cx-btnR*0.3, btnY-btnR*0.4, btnR*0.3, 0, Math.PI*2); ctx.fill();
   }
 
   function drawFilledPit(){
@@ -2607,11 +3102,15 @@
           const seed = m.impactM*3.1 + m.idx*0.7;
           if(m.progress < MISSILE_FALL_FRAC){
             const fallProgress = m.progress / MISSILE_FALL_FRAC;
-            const stopY = m.absorbed ? (mainLaneY - SHIELD_HEIGHT_M*scalePx()) : mainLaneY;
-            drawMissileFall(cx, mainLaneY, fallProgress, seed, stopY);
+            const stopY = m.absorbed ? (mainLaneY - (m.stopHeightM||SHIELD_HEIGHT_M)*scalePx()) : mainLaneY;
+            if(hz.type === 'meteor'){
+              drawMeteorFall(cx, mainLaneY, fallProgress, seed, stopY);
+            } else {
+              drawMissileFall(cx, mainLaneY, fallProgress, seed, stopY);
+            }
           } else if(m.absorbed){
             const absorbProgress = (m.progress - MISSILE_FALL_FRAC) / (1 - MISSILE_FALL_FRAC);
-            drawShieldAbsorb(cx, mainLaneY, absorbProgress);
+            drawShieldAbsorb(cx, mainLaneY, absorbProgress, m.stopHeightM);
           } else {
             const explosionProgress = (m.progress - MISSILE_FALL_FRAC) / (1 - MISSILE_FALL_FRAC);
             drawAirstrikeExplosion(cx, mainLaneY, explosionProgress, seed);
@@ -2627,21 +3126,23 @@
         if(isActive){
           const x1 = mToPx(segStartM), x2 = mToPx(segEndM);
           const segWidth = x2-x1;
+          const groundYSeg = (gameStage === 3) ? groundYAtM((segStartM+segEndM)/2) : mainLaneY;
+          const flameCenterYSeg = groundYSeg - heightPx/2;
           const cols = Math.max(1, Math.round(segWidth/(burstR*1.3)));
           const colWidth = segWidth/cols;
           const fireR = Math.min(burstR, colWidth/3.6);
           const midIndex = Math.floor(cols/2);
           ctx.save();
           ctx.beginPath();
-          ctx.rect(x1, 0, segWidth, mainLaneY);
+          ctx.rect(x1, 0, segWidth, groundYSeg);
           ctx.clip();
           for(let c=0; c<cols; c++){
             if(c === midIndex) continue;
             const bx = x1 + segWidth*((c+0.5)/cols);
-            drawFireBurstIntense(bx, flameCenterY, fireR, now, i*13+c*3, bomb.segProgress);
+            drawFireBurstIntense(bx, flameCenterYSeg, fireR, now, i*13+c*3, bomb.segProgress);
           }
           const midBx = x1 + segWidth*((midIndex+0.5)/cols);
-          drawFireBurstIntense(midBx, flameCenterY, fireR*3, now, i*13+midIndex*3, bomb.segProgress);
+          drawFireBurstIntense(midBx, flameCenterYSeg, fireR*3, now, i*13+midIndex*3, bomb.segProgress);
           ctx.restore();
         }
       }
@@ -2782,7 +3283,7 @@
   }
 
   function drawScene(bombState, nowTs){
-    drawGrid();
+    if(gameStage === 3){ drawGrid3(); } else { drawGrid(); }
     if(gameStage === 2){
       if(pitFilled){ drawFilledPit(); } else { drawPit(); }
     }
@@ -2793,6 +3294,7 @@
     });
     if(gameStage === 2){
       drawShield(nowTs);
+      drawWall();
     }
     Object.keys(bombState).forEach((key)=>{
       drawHazard(bombState[key]);
@@ -2812,15 +3314,35 @@
       const sinkT = objectBSinking ? (performance.now()-objectBSinkStart)/OBJECT_B_SINK_MS : 0;
       drawObjectB(objectBM, objectBV, sinkT);
     }
-    drawDistanceLabel();
+    if(gameStage !== 3){ drawDistanceLabel(); }
     drawLegStart();
 
-    ctx.strokeStyle = '#B7AD95'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(0, mainLaneY); ctx.lineTo(W, mainLaneY); ctx.stroke();
+    if(gameStage !== 3){
+      ctx.strokeStyle = '#B7AD95'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, mainLaneY); ctx.lineTo(W, mainLaneY); ctx.stroke();
+    }
 
     const ballPx = mToPx(ballM);
     const startPx = mToPx(legStartM);
-    if(mode === 'flying' || mode === 'resting'){
+    if(gameStage === 3){
+      const groundY3 = s3BallGroundY(ballM);
+      const slopeAngle3 = s3SlopeAngleAt(ballM);
+      if(mode === 'flying' || mode === 'resting' || mode === 'aiming' || mode === 'locked' || mode === 'win'){
+        ctx.save();
+        ctx.translate(ballPx, groundY3);
+        ctx.rotate(slopeAngle3);
+        ctx.fillStyle = currentColor;
+        ctx.fillRect(-ballR, -ballR*2, ballR*2, ballR*2);
+        ctx.strokeStyle = '#242220'; ctx.lineWidth = 1;
+        ctx.strokeRect(-ballR, -ballR*2, ballR*2, ballR*2);
+        ctx.restore();
+      } else if(mode === 'exploding'){
+        const progress = Math.min(1, (performance.now()-explosionStart)/EXPLOSION_DURATION);
+        drawExplosionAnim(ballPx, progress);
+      } else if(mode === 'gameover'){
+        if(gameOverReason === 'bomb') drawExplosion(ballPx);
+      }
+    } else if(mode === 'flying' || mode === 'resting'){
       drawLane(startPx, ballPx, mainLaneY, currentColor, 1, true);
     } else if(mode === 'aiming' || mode === 'locked'){
       ctx.fillStyle = currentColor;
@@ -2842,12 +3364,15 @@
     }
 
     if(gameStage === 2 && collidedWithMud && (mode === 'flying' || mode === 'resting')){
+      const squash = collidedWithWall;
       const rightCx = ballPx + ballR*1.5;
       const rightCy = mainLaneY - ballR*1.3;
-      const rightRx = ballR*0.7, rightRy = ballR*1.3;
+      const rightRx = squash ? ballR*0.4 : ballR*0.7;
+      const rightRy = squash ? ballR*1.6 : ballR*1.3;
       const topCx = ballPx + ballR*0.5;
       const topCy = mainLaneY - ballR*2;
-      const topRx = ballR*0.8, topRy = ballR*0.6;
+      const topRx = ballR*0.8;
+      const topRy = ballR*0.6;
       ctx.fillStyle = '#7A5230';
       ctx.beginPath();
       ctx.ellipse(rightCx, rightCy, rightRx, rightRy, 0, 0, Math.PI*2);
@@ -3175,7 +3700,10 @@
     pitFilled = false;
     bombZoneTriggered = false;
     bombZoneTriggerTime = null;
+    pinkShieldFadeStart = null;
     collidedWithMud = false;
+    collidedWithWall = false;
+    s3FallStartTime = null;
     if(sedativeBtn) sedativeBtn.style.display = 'none';
     if(sedativeStatusEl) sedativeStatusEl.classList.remove('show');
     gameStage = 1;
@@ -3214,6 +3742,10 @@
     const dt = Math.min((now-lastFrameTime)/1000, 0.032);
     lastFrameTime = now;
 
+    if(gameStage === 1 && sedativeCollected && !sedativeUsed && !gamePausedForItem){
+      sedativeBtn.style.display = (mode === 'aiming') ? 'flex' : 'none';
+    }
+
     if(!gamePausedForItem){
       if(mode === 'aiming'){
         const q = QUANTITIES[phaseIndex];
@@ -3223,6 +3755,52 @@
         const els = gaugeEls(q.key);
         els.marker.style.left = (fraction*100)+'%';
       } else if(mode === 'flying'){
+        if(gameStage === 3){
+          const ballR_m3 = ballR/scalePx();
+          const willHitCliffWall = (ballM - ballR_m3 > S3_X_CLIFF) && (s3Vx < 0) && ((ballM + s3Vx*dt) - ballR_m3 <= S3_X_CLIFF);
+          if(willHitCliffWall){
+            ballM = S3_X_CLIFF + ballR_m3;
+            s3Vx = 0;
+            flightV = 0;
+            collidedWithWall = true;
+            mode = 'resting';
+            resultEl.className = 'result success';
+            resultEl.textContent = '절벽 벽에 충돌했습니다! 잠시 후 스테이지가 클리어됩니다…';
+            mainBtn.disabled = true;
+            mainBtn.textContent = '\u00A0';
+            mainBtn.onclick = null;
+            playWallImpactSound();
+            setTimeout(()=>{
+              clearedStages.push(3);
+              showStageClearOverlay('stage3: 언덕의 구역 클리어', '처음부터 시작', fullReset);
+            }, 1000);
+          } else {
+            const cosBefore = s3CosThetaAt(ballM);
+            const ax = s3AccelAt(ballM);
+            s3Vx += ax*dt;
+            const ballR_m3b = ballR/scalePx();
+            const prevLeftEdge3 = ballM - ballR_m3b;
+            ballM += s3Vx*dt;
+            const newLeftEdge3 = ballM - ballR_m3b;
+            if(s3FallStartTime === null && prevLeftEdge3 < S3_X_CLIFF && newLeftEdge3 >= S3_X_CLIFF && s3Vx > 0){
+              s3FallStartTime = performance.now();
+            }
+            const cosAfter = s3CosThetaAt(ballM);
+            if(cosAfter !== cosBefore){
+              // entering/leaving an incline: rescale so the TRUE speed (not just its
+              // horizontal component) stays continuous across the slope-angle change
+              s3Vx = s3Vx * (cosAfter/cosBefore);
+            }
+            // falling off the ledge: gravity only acts vertically during the drop, so
+            // the horizontal speed carries over completely unchanged — the fall's
+            // vertical speed is absorbed by the ground on landing and never
+            // contributes to horizontal motion.
+            flightV = Math.abs(s3Vx);
+            if(ballM < -3 || ballM > S3_WORLD_END_M){
+              triggerBoundaryGameOver();
+            }
+          }
+        } else {
         ballM += flightV*dt;
         flightV = Math.max(0, flightV - flightDecel*dt);
 
@@ -3239,6 +3817,23 @@
           }
         }
 
+        if(gameStage === 2 && mode === 'flying' && !collidedWithWall && ballM + ballR/scalePx() >= S2_WALL_LEFT_M){
+          ballM = S2_WALL_LEFT_M - ballR/scalePx();
+          flightV = 0;
+          collidedWithWall = true;
+          mode = 'resting';
+          resultEl.className = 'result success';
+          resultEl.textContent = '벽에 충돌했습니다! 잠시 후 스테이지가 클리어됩니다…';
+          mainBtn.disabled = true;
+          mainBtn.textContent = '\u00A0';
+          mainBtn.onclick = null;
+          playWallImpactSound();
+          setTimeout(()=>{
+            clearedStages.push(2);
+            showStageClearOverlay('stage2: 충돌의 구역 클리어', '처음부터 시작', fullReset);
+          }, 1000);
+        }
+
         if(gameStage === 2 && !collidedWithMud && ballM >= S2_MUD_M){
           // perfectly inelastic collision: 2kg ball + 2kg mud -> 4kg combined
           preMudCollisionV = flightV;
@@ -3251,12 +3846,15 @@
           collectSedative();
         }
 
-        const outOfBoundsM = getLastZoneCfg().targetRightM + 5;
-        const stopped = flightV <= 0.05;
-        const outOfBounds = ballM > outOfBoundsM;
-        if(stopped || outOfBounds){
-          if(outOfBounds) ballM = outOfBoundsM;
-          finishShot();
+        if(!collidedWithWall){
+          const outOfBoundsM = getLastZoneCfg().targetRightM + 5;
+          const stopped = flightV <= 0.05;
+          const outOfBounds = ballM > outOfBoundsM;
+          if(stopped || outOfBounds){
+            if(outOfBounds) ballM = outOfBoundsM;
+            finishShot();
+          }
+        }
         }
       } else if(mode === 'exploding'){
         if(performance.now() - explosionStart >= EXPLOSION_DURATION){
@@ -3281,8 +3879,10 @@
             pitFilled = true;
             bombZoneTriggered = true;
             bombZoneTriggerTime = performance.now();
+            pinkShieldFadeStart = performance.now();
+            playShieldFadeSound();
             if(mode === 'resting' && stage === 1 && gameStage === 2){
-              startS2Zone2();
+              setTimeout(()=>{ if(mode === 'resting' && stage === 1) startS2Zone2(); }, 2000);
             }
           }
         }
@@ -3393,6 +3993,8 @@
 
     if(chosenStage === 2){
       startGameStage2();
+    } else if(chosenStage === 3){
+      startGameStage3();
     } else {
       gameStage = 1;
       ACTIVE_ZONES = STAGE1_ZONES;
