@@ -922,6 +922,7 @@
   let pitFilled = false;
   let bombZoneTriggered = false;
   let collidedWithMud = false;
+  let preMudCollisionV = 0;
   let deathElapsedMs = 0;
 
   const STAGE1_ZONES = {
@@ -956,7 +957,6 @@
   const S2_ZONE2_CENTER_M = S2_ZONE1_CENTER_M + 20;
   const S2_ZONE2_LEFT_M = S2_ZONE2_CENTER_M - S2_ZONE_WIDTH_M/2;
   const S2_ZONE2_RIGHT_M = S2_ZONE2_CENTER_M + S2_ZONE_WIDTH_M/2;
-  const PIT_WIDTH_M = 1.1;
   const OBJECT_B_SINK_MS = 550;
 
   const SHIELD_LEN_M = 5;
@@ -986,10 +986,10 @@
   const SEDATIVE_M = (ZONE1_RIGHT_M + ZONE2_LEFT_M) / 2; // item location, midpoint of stage1 zone1-2 gap
 
   const QUANTITIES_STAGE1 = [
-    {key:'v0', label:'초기속도 v0', min:0, max:20, step:5, decimals:1, speed:1/3, unit:'m/s'}
+    {key:'v0', label:'초기속도 v0', min:0, max:20, step:5, decimals:2, speed:1/3, unit:'m/s'}
   ];
   const QUANTITIES_STAGE2 = [
-    {key:'v0', label:'초기속도 v0', min:0, max:20, step:5, decimals:1, speed:1/3, unit:'m/s'}
+    {key:'v0', label:'초기속도 v0', min:0, max:20, step:5, decimals:2, speed:1/3, unit:'m/s'}
   ];
 
   let gameStage = 1;
@@ -1495,6 +1495,68 @@
     noiseFilter.frequency.value = 1100;
     const noiseGain = audioCtx.createGain();
     noiseGain.gain.setValueAtTime(0.4, t0);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(masterGain);
+    noise.start(t0);
+  }
+
+  function playMudSquelchSound(){
+    if(!audioCtx || !masterGain) return;
+    const t0 = audioCtx.currentTime;
+
+    // sharp initial "smack" transient so it cuts through the mix, not just a dull thud
+    const smackDur = 0.05;
+    const smackSize = Math.max(1, Math.floor(audioCtx.sampleRate * smackDur));
+    const smackBuffer = audioCtx.createBuffer(1, smackSize, audioCtx.sampleRate);
+    const smackData = smackBuffer.getChannelData(0);
+    for(let i=0;i<smackSize;i++){
+      smackData[i] = (Math.random()*2-1) * (1 - i/smackSize);
+    }
+    const smack = audioCtx.createBufferSource();
+    smack.buffer = smackBuffer;
+    const smackFilter = audioCtx.createBiquadFilter();
+    smackFilter.type = 'bandpass';
+    smackFilter.frequency.value = 1400;
+    smackFilter.Q.value = 0.7;
+    const smackGain = audioCtx.createGain();
+    smackGain.gain.setValueAtTime(0.7, t0);
+    smackGain.gain.exponentialRampToValueAtTime(0.001, t0 + smackDur);
+    smack.connect(smackFilter);
+    smackFilter.connect(smackGain);
+    smackGain.connect(masterGain);
+    smack.start(t0);
+
+    // low "blorp" thump
+    const osc = audioCtx.createOscillator();
+    const oscGain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(220, t0);
+    osc.frequency.exponentialRampToValueAtTime(65, t0 + 0.2);
+    oscGain.gain.setValueAtTime(0.0001, t0);
+    oscGain.gain.exponentialRampToValueAtTime(0.75, t0 + 0.015);
+    oscGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.28);
+    osc.connect(oscGain);
+    oscGain.connect(masterGain);
+    osc.start(t0);
+    osc.stop(t0 + 0.3);
+
+    // wet, muffled noise burst for the squelch texture
+    const dur = 0.3;
+    const bufferSize = Math.max(1, Math.floor(audioCtx.sampleRate * dur));
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<bufferSize;i++){
+      data[i] = (Math.random()*2-1) * (1 - i/bufferSize);
+    }
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    const noiseFilter = audioCtx.createBiquadFilter();
+    noiseFilter.type = 'lowpass';
+    noiseFilter.frequency.value = 1000;
+    const noiseGain = audioCtx.createGain();
+    noiseGain.gain.setValueAtTime(0.65, t0);
     noiseGain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
     noise.connect(noiseFilter);
     noiseFilter.connect(noiseGain);
@@ -2360,9 +2422,10 @@
   }
 
   function drawPit(){
-    const x1 = mToPx(S2_PIT_M - PIT_WIDTH_M/2);
-    const x2 = mToPx(S2_PIT_M + PIT_WIDTH_M/2);
-    const depth = Math.min(28, (H-mainLaneY)*0.55);
+    const cx = mToPx(S2_PIT_M);
+    const x1 = cx - ballR;
+    const x2 = cx + ballR;
+    const depth = ballR*2;
     const grad = ctx.createLinearGradient(0, mainLaneY, 0, mainLaneY+depth);
     grad.addColorStop(0, '#2A2018');
     grad.addColorStop(1, '#4A3826');
@@ -2374,6 +2437,16 @@
     ctx.beginPath(); ctx.moveTo(x2-0.5, mainLaneY); ctx.lineTo(x2-0.5, mainLaneY+depth); ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,0.15)';
     ctx.beginPath(); ctx.moveTo(x1, mainLaneY+0.5); ctx.lineTo(x2, mainLaneY+0.5); ctx.stroke();
+  }
+
+  function drawFilledPit(){
+    const cx = mToPx(S2_PIT_M);
+    ctx.fillStyle = '#B94A4A';
+    ctx.fillRect(cx-ballR, mainLaneY, ballR*2, ballR*2);
+    ctx.strokeStyle = '#242220'; ctx.lineWidth = 1;
+    ctx.strokeRect(cx-ballR, mainLaneY, ballR*2, ballR*2);
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.moveTo(cx-ballR, mainLaneY+0.5); ctx.lineTo(cx+ballR, mainLaneY+0.5); ctx.stroke();
   }
 
   function drawMudLump(cx, groundY){
@@ -2412,12 +2485,8 @@
     const x = mToPx(m);
     const sink = (typeof sinkT === 'number') ? Math.min(1, Math.max(0, sinkT)) : 0;
     const eased = sink*sink*(3-2*sink); // smooth ease in/out
-    const dy = eased * (ballR*2 + 3);
+    const dy = eased * (ballR*2); // sinks exactly flush with the ground, filling the pit — no clip needed, it's sinking into an empty hole, not solid ground
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, W, mainLaneY);
-    ctx.clip();
-    ctx.globalAlpha = 1 - eased*0.15;
     ctx.fillStyle = '#B94A4A';
     ctx.fillRect(x-ballR, mainLaneY-ballR*2+dy, ballR*2, ballR*2);
     ctx.strokeStyle = '#242220'; ctx.lineWidth = 1;
@@ -2430,7 +2499,7 @@
       ctx.fillText('2kg', x, mainLaneY-ballR*2-6+dy);
       if(typeof speedMps === 'number'){
         ctx.textAlign = 'left';
-        ctx.fillText(speedMps.toFixed(1)+' m/s', x+ballR+5, mainLaneY-ballR+dy);
+        ctx.fillText(speedMps.toFixed(2)+' m/s', x+ballR+5, mainLaneY-ballR+dy);
       }
       ctx.textAlign = 'left';
     }
@@ -2685,8 +2754,8 @@
 
   function drawScene(bombState, nowTs){
     drawGrid();
-    if(gameStage === 2 && !pitFilled){
-      drawPit();
+    if(gameStage === 2){
+      if(pitFilled){ drawFilledPit(); } else { drawPit(); }
     }
     const cfg = currentStageCfg();
     Object.keys(ACTIVE_ZONES).forEach((key)=>{
@@ -2744,14 +2813,29 @@
     }
 
     if(gameStage === 2 && collidedWithMud && (mode === 'flying' || mode === 'resting')){
+      const rightCx = ballPx + ballR*1.5;
+      const rightCy = mainLaneY - ballR*1.3;
+      const rightRx = ballR*0.7, rightRy = ballR*1.3;
+      const topCx = ballPx + ballR*0.5;
+      const topCy = mainLaneY - ballR*2;
+      const topRx = ballR*0.8, topRy = ballR*0.6;
+      ctx.fillStyle = '#7A5230';
+      ctx.beginPath();
+      ctx.ellipse(rightCx, rightCy, rightRx, rightRy, 0, 0, Math.PI*2);
+      ctx.ellipse(topCx, topCy, topRx, topRy, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(50,32,18,0.5)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(rightCx, rightCy, rightRx, rightRy, 0, 0, Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(topCx, topCy, topRx, topRy, 0, 0, Math.PI*2); ctx.stroke();
+
       ctx.font = '700 11px -apple-system, sans-serif';
       ctx.fillStyle = '#8E5A2E';
       ctx.textAlign = 'center';
-      ctx.fillText('4kg', ballPx, mainLaneY-ballR*2-6);
+      ctx.fillText('4kg', ballPx, mainLaneY-ballR*2-topRy-8);
       ctx.font = '600 11px -apple-system, sans-serif';
       ctx.fillStyle = '#242220';
       ctx.textAlign = 'left';
-      ctx.fillText(flightV.toFixed(1)+' m/s', ballPx+ballR+5, mainLaneY-ballR);
+      ctx.fillText(flightV.toFixed(2)+' m/s', rightCx+rightRx+5, mainLaneY-ballR);
       ctx.textAlign = 'left';
     }
 
@@ -2958,11 +3042,10 @@
     } else if(success && stage === 1 && gameStage === 2){
       mode = 'resting';
       resultEl.className = 'result success';
-      resultEl.textContent = cfg.targetName + ' 도착! 곧바로 다음 구간으로 이동합니다…';
+      resultEl.textContent = cfg.targetName + ' 도착! 물체B가 구덩이에 완전히 빠질 때까지 잠시 기다려주세요…';
       mainBtn.disabled = true;
       mainBtn.textContent = '이동 중…';
       mainBtn.onclick = null;
-      setTimeout(()=>{ if(mode === 'resting' && stage === 1) startS2Zone2(); }, 900);
     } else if(success && gameStage === 2 && !cfg.isLast){
       mode = 'resting';
       resultEl.className = 'result success';
@@ -3128,8 +3211,10 @@
 
         if(gameStage === 2 && !collidedWithMud && ballM >= S2_MUD_M){
           // perfectly inelastic collision: 2kg ball + 2kg mud -> 4kg combined
+          preMudCollisionV = flightV;
           flightV = flightV * (2/(2+2));
           collidedWithMud = true;
+          playMudSquelchSound();
         }
 
         if(gameStage === 1 && !sedativeCollected && ballM >= SEDATIVE_M){
@@ -3165,6 +3250,9 @@
             objectBSinking = false;
             pitFilled = true;
             bombZoneTriggered = true;
+            if(mode === 'resting' && stage === 1 && gameStage === 2){
+              startS2Zone2();
+            }
           }
         }
       }
