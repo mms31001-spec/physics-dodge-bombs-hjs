@@ -930,7 +930,6 @@
   let collidedWithMud = false;
   let collidedWithWall = false;
   let s3Vx = 0;
-  let s3FallStartTime = null; // real timestamp when the ball's left edge left the cliff edge
   let preMudCollisionV = 0;
   let deathElapsedMs = 0;
 
@@ -1013,23 +1012,60 @@
   // ---- Stage 3: 언덕의 구역 — sloped terrain, energy conservation (frictionless) ----
   const S3_FLAT0_LEN = 5;
   const S3_HILL1_RUN = 10, S3_HILL1_RISE = 4.5;
-  const S3_FLAT1_LEN = 5;
-  const S3_CLIFF_DROP = 1;
-  const S3_FLAT2_LEN = 10;
-  const S3_HILL2_RUN = 3, S3_HILL2_RISE = 1.0;
+  const S3_HILL2_RUN = 2, S3_HILL2_RISE = 1.0;
 
   const S3_X_HILL1_START = S3_FLAT0_LEN; // 5
   const S3_X_HILL1_END = S3_X_HILL1_START + S3_HILL1_RUN; // 15
-  const S3_X_CLIFF = S3_X_HILL1_END + S3_FLAT1_LEN; // 20 — cliff face / wall (restitution 0), height 0.5m
-  const S3_X_FLAT2_END = S3_X_CLIFF + S3_FLAT2_LEN; // 25
-  const S3_X_HILL2_END = S3_X_FLAT2_END + S3_HILL2_RUN; // 28
-  const S3_HEIGHT_LOWER_PLATEAU = S3_HILL1_RISE - S3_CLIFF_DROP; // 4.0
-  const S3_HEIGHT_HILL2_TOP = S3_HEIGHT_LOWER_PLATEAU + S3_HILL2_RISE; // 5.5
-  const S3_WORLD_END_M = S3_X_HILL2_END + 12; // temporary boundary beyond hill2, until hazards are built
 
-  // cos(theta) for each sloped segment, used to convert along-slope speed to horizontal speed
-  const S3_HILL1_COS = S3_HILL1_RUN / Math.sqrt(S3_HILL1_RUN*S3_HILL1_RUN + S3_HILL1_RISE*S3_HILL1_RISE);
-  const S3_HILL2_COS = S3_HILL2_RUN / Math.sqrt(S3_HILL2_RUN*S3_HILL2_RUN + S3_HILL2_RISE*S3_HILL2_RISE);
+  // the button: a small red right-triangle bump sitting on the flat stretch after hill1.
+  // Left face is a 45-degree ramp; right face is a vertical wall. While something is
+  // crossing it, it's pressed flush with the ground (no resistance); once clear, it
+  // pops back up, and its right face then acts as a restitution-0 wall for anything
+  // approaching from the right.
+  const S3_BUTTON_HEIGHT = 0.5;
+  const S3_BUTTON_LEFT = S3_X_HILL1_END + 2; // 17 — 2m past the end of hill1
+  const S3_BUTTON_RIGHT = S3_BUTTON_LEFT + S3_BUTTON_HEIGHT; // 17.5 (45 degrees: run = height)
+  let s3ButtonPressed = false;
+
+  const S3_X_FLAT2_END = S3_BUTTON_RIGHT + 1.5; // hill2 starts 1.5m past the button
+  const S3_X_HILL2_END = S3_X_FLAT2_END + S3_HILL2_RUN;
+  const S3_HEIGHT_HILL2_TOP = S3_HILL1_RISE + S3_HILL2_RISE; // 5.5 — also the height of flat3, hillA/hillB's base
+
+  // ---- leg 2: flat3 -> hill A -> valley (with a small flat bottom) -> hill B -> next flat ----
+  // Hill/valley slopes are smooth curves (zero slope at every peak/valley/flat junction) rather
+  // than straight ramps, so they blend into each other with no sharp corner anywhere.
+  const S3_LEG2_FLAT3_LEN = 15;
+  const S3_X_FLAT3_END = S3_X_HILL2_END + S3_LEG2_FLAT3_LEN; // 36
+
+  const S3_HILLA_RUN_UP = 10;
+  const S3_X_HILLA_TOP = S3_X_FLAT3_END + S3_HILLA_RUN_UP; // 46
+  const S3_HILLA_RISE = 19.5;
+  const S3_HEIGHT_HILLA_TOP = S3_HEIGHT_HILL2_TOP + S3_HILLA_RISE; // 25
+
+  const S3_VALLEY_FLAT_HALFLEN = 1;
+  const S3_HILLA_RUN_DOWN = 5 - S3_VALLEY_FLAT_HALFLEN; // 4 (5m from hillA top to valley center, minus the 1m half-flat)
+  const S3_X_VALLEY_FLAT_START = S3_X_HILLA_TOP + S3_HILLA_RUN_DOWN; // 50
+  const S3_VALLEY_DROP = 10;
+  const S3_HEIGHT_VALLEY = S3_HEIGHT_HILLA_TOP - S3_VALLEY_DROP; // 15
+  const S3_X_VALLEY_FLAT_END = S3_X_VALLEY_FLAT_START + S3_VALLEY_FLAT_HALFLEN*2; // 52
+
+  const S3_HILLB_RUN_UP = 5 - S3_VALLEY_FLAT_HALFLEN; // 4
+  const S3_X_HILLB_TOP = S3_X_VALLEY_FLAT_END + S3_HILLB_RUN_UP; // 56
+  const S3_HEIGHT_HILLB_TOP = S3_HEIGHT_HILL2_TOP + 20.5; // 26
+
+  const S3_HILLB_RUN_DOWN = 5;
+  const S3_X_HILLB_DOWN_END = S3_X_HILLB_TOP + S3_HILLB_RUN_DOWN; // 61
+  const S3_HILLB_DROP = 5;
+  const S3_HEIGHT_AFTER_HILLB = S3_HEIGHT_HILLB_TOP - S3_HILLB_DROP; // 21
+
+  const S3_MAX_HEIGHT = S3_HEIGHT_HILLB_TOP; // for camera/minimap vertical scaling
+  const S3_WORLD_END_M = S3_X_HILLB_DOWN_END + 12; // temporary boundary past hill B, until hazards are built
+
+  // smooth S-curve: 0 at t=0, 1 at t=1, zero slope at both ends — used so every hill/valley
+  // transitions into its neighboring flat or slope with no sharp corner
+  function s3SmoothRamp(t){
+    return (1 - Math.cos(Math.PI * Math.min(1, Math.max(0, t)))) / 2;
+  }
 
   function s3TerrainHeightM(xM){
     if(xM <= S3_X_HILL1_START) return 0;
@@ -1037,46 +1073,82 @@
       const t = (xM - S3_X_HILL1_START) / S3_HILL1_RUN;
       return t * S3_HILL1_RISE;
     }
-    if(xM < S3_X_CLIFF) return S3_HILL1_RISE;
-    if(xM < S3_X_FLAT2_END) return S3_HEIGHT_LOWER_PLATEAU;
+    if(xM < S3_X_FLAT2_END){
+      if(!s3ButtonPressed && xM >= S3_BUTTON_LEFT && xM < S3_BUTTON_RIGHT){
+        const t = (xM - S3_BUTTON_LEFT) / S3_BUTTON_HEIGHT;
+        return S3_HILL1_RISE + t*S3_BUTTON_HEIGHT;
+      }
+      return S3_HILL1_RISE;
+    }
     if(xM < S3_X_HILL2_END){
       const t = (xM - S3_X_FLAT2_END) / S3_HILL2_RUN;
-      return S3_HEIGHT_LOWER_PLATEAU + t*S3_HILL2_RISE;
+      return S3_HILL1_RISE + t*S3_HILL2_RISE;
     }
-    return S3_HEIGHT_HILL2_TOP;
+    if(xM < S3_X_FLAT3_END) return S3_HEIGHT_HILL2_TOP;
+    if(xM < S3_X_HILLA_TOP){
+      const t = (xM - S3_X_FLAT3_END) / S3_HILLA_RUN_UP;
+      return S3_HEIGHT_HILL2_TOP + s3SmoothRamp(t)*S3_HILLA_RISE;
+    }
+    if(xM < S3_X_VALLEY_FLAT_START){
+      const t = (xM - S3_X_HILLA_TOP) / S3_HILLA_RUN_DOWN;
+      return S3_HEIGHT_HILLA_TOP - s3SmoothRamp(t)*S3_VALLEY_DROP;
+    }
+    if(xM < S3_X_VALLEY_FLAT_END) return S3_HEIGHT_VALLEY;
+    if(xM < S3_X_HILLB_TOP){
+      const t = (xM - S3_X_VALLEY_FLAT_END) / S3_HILLB_RUN_UP;
+      return S3_HEIGHT_VALLEY + s3SmoothRamp(t)*(S3_HEIGHT_HILLB_TOP - S3_HEIGHT_VALLEY);
+    }
+    if(xM < S3_X_HILLB_DOWN_END){
+      const t = (xM - S3_X_HILLB_TOP) / S3_HILLB_RUN_DOWN;
+      return S3_HEIGHT_HILLB_TOP - s3SmoothRamp(t)*S3_HILLB_DROP;
+    }
+    return S3_HEIGHT_AFTER_HILLB;
   }
 
-  // horizontal component of gravity-conservation speed at position xM (magnitude only, direction applied by caller)
-  function s3HorizSpeedAt(xM, v0){
-    const h = s3TerrainHeightM(xM);
-    const sAlong = Math.sqrt(Math.max(0, v0*v0 - 2*GRAVITY_G*h));
-    let cosT = 1;
-    if(xM > S3_X_HILL1_START && xM < S3_X_HILL1_END) cosT = S3_HILL1_COS;
-    else if(xM > S3_X_FLAT2_END && xM < S3_X_HILL2_END) cosT = S3_HILL2_COS;
-    return sAlong * cosT;
-  }
-
-  const S3_HILL1_SINCOS = (S3_HILL1_RISE/Math.sqrt(S3_HILL1_RUN*S3_HILL1_RUN+S3_HILL1_RISE*S3_HILL1_RISE)) * S3_HILL1_COS;
-  const S3_HILL2_SINCOS = (S3_HILL2_RISE/Math.sqrt(S3_HILL2_RUN*S3_HILL2_RUN+S3_HILL2_RISE*S3_HILL2_RISE)) * S3_HILL2_COS;
-  // horizontal component of gravitational acceleration at xM (always points downhill / toward -x on both inclines; 0 on flat ground)
-  function s3AccelAt(xM){
-    if(xM > S3_X_HILL1_START && xM < S3_X_HILL1_END) return -GRAVITY_G * S3_HILL1_SINCOS;
-    if(xM > S3_X_FLAT2_END && xM < S3_X_HILL2_END) return -GRAVITY_G * S3_HILL2_SINCOS;
+  // local terrain slope dh/dx at xM — piecewise-constant on the straight ramps
+  // (hill1, hill2), and the true derivative of the smooth-ramp curve elsewhere
+  // (hillA, the valley, hillB). Every other physics quantity below is derived
+  // from this single function so straight and curved ground behave consistently.
+  function s3DhDx(xM){
+    if(xM > S3_X_HILL1_START && xM < S3_X_HILL1_END) return S3_HILL1_RISE/S3_HILL1_RUN;
+    if(xM > S3_X_FLAT2_END && xM < S3_X_HILL2_END) return S3_HILL2_RISE/S3_HILL2_RUN;
+    if(xM > S3_X_FLAT3_END && xM < S3_X_HILLA_TOP){
+      const t = (xM - S3_X_FLAT3_END) / S3_HILLA_RUN_UP;
+      return S3_HILLA_RISE * (Math.PI/2) * Math.sin(Math.PI*t) / S3_HILLA_RUN_UP;
+    }
+    if(xM > S3_X_HILLA_TOP && xM < S3_X_VALLEY_FLAT_START){
+      const t = (xM - S3_X_HILLA_TOP) / S3_HILLA_RUN_DOWN;
+      return -S3_VALLEY_DROP * (Math.PI/2) * Math.sin(Math.PI*t) / S3_HILLA_RUN_DOWN;
+    }
+    if(xM > S3_X_VALLEY_FLAT_END && xM < S3_X_HILLB_TOP){
+      const t = (xM - S3_X_VALLEY_FLAT_END) / S3_HILLB_RUN_UP;
+      const rise = S3_HEIGHT_HILLB_TOP - S3_HEIGHT_VALLEY;
+      return rise * (Math.PI/2) * Math.sin(Math.PI*t) / S3_HILLB_RUN_UP;
+    }
+    if(xM > S3_X_HILLB_TOP && xM < S3_X_HILLB_DOWN_END){
+      const t = (xM - S3_X_HILLB_TOP) / S3_HILLB_RUN_DOWN;
+      return -S3_HILLB_DROP * (Math.PI/2) * Math.sin(Math.PI*t) / S3_HILLB_RUN_DOWN;
+    }
     return 0;
   }
+  // horizontal component of gravitational acceleration at xM (points downhill; 0 on flat ground)
+  function s3AccelAt(xM){
+    const slope = s3DhDx(xM);
+    if(slope === 0) return 0;
+    const cosT = 1/Math.sqrt(1+slope*slope);
+    const sinT = slope*cosT;
+    return -GRAVITY_G * sinT * cosT;
+  }
   // cos(theta) of the slope at xM (1 on flat ground) — used to rescale the tracked
-  // horizontal velocity when crossing into/out of an incline, so the TRUE speed
-  // (not just its horizontal component) stays continuous and energy is conserved.
+  // horizontal velocity as the slope changes, so the TRUE speed (not just its
+  // horizontal component) stays continuous and energy is conserved.
   function s3CosThetaAt(xM){
-    if(xM > S3_X_HILL1_START && xM < S3_X_HILL1_END) return S3_HILL1_COS;
-    if(xM > S3_X_FLAT2_END && xM < S3_X_HILL2_END) return S3_HILL2_COS;
-    return 1;
+    const slope = s3DhDx(xM);
+    return slope === 0 ? 1 : 1/Math.sqrt(1+slope*slope);
   }
   // rotation angle (canvas radians) so a box's bottom edge lies flush against the local slope
   function s3SlopeAngleAt(xM){
-    if(xM > S3_X_HILL1_START && xM < S3_X_HILL1_END) return -Math.atan2(S3_HILL1_RISE, S3_HILL1_RUN);
-    if(xM > S3_X_FLAT2_END && xM < S3_X_HILL2_END) return -Math.atan2(S3_HILL2_RISE, S3_HILL2_RUN);
-    return 0;
+    return -Math.atan(s3DhDx(xM));
   }
 
   const QUANTITIES_STAGE1 = [
@@ -1091,12 +1163,16 @@
 
   const STAGE3_ZONES = {
     1: {
-      targetLeftM: S3_X_CLIFF, targetRightM: S3_X_FLAT2_END, targetName: '안전지대',
+      targetLeftM: S3_BUTTON_RIGHT, targetRightM: S3_X_FLAT2_END, targetName: '안전지대1',
       hazard: {type:'segments', baseM:1, segLenM:14/10, count:10, segDurationSec:0.25, pauseSec:1.2}
+    },
+    2: {
+      targetLeftM: S3_X_HILLA_TOP, targetRightM: S3_X_HILLB_TOP, targetName: '안전지대2'
     }
   };
   const STAGE3_VIEWS = {
-    1: { startM: 0, spanM: S3_WORLD_END_M + 3 }
+    1: { startM: 0, spanM: (S3_X_HILL2_END + 4 + 3) / 1.2 },
+    2: { startM: S3_X_HILL1_END, spanM: (S3_WORLD_END_M - S3_X_HILL1_END + 3) / 1.2 }
   };
 
   let gameStage = 1;
@@ -1923,7 +1999,6 @@
     collidedWithB = false;
     collidedWithMud = false;
     collidedWithWall = false;
-    s3FallStartTime = null;
     sedativeStatusEl.classList.remove('show');
     hideFoulOverlay();
     mainBtn.disabled = false;
@@ -1935,6 +2010,15 @@
     resultEl.textContent = '새 샷 준비 완료. 스페이스바로 v0 값을 고정해보세요.';
     updateDistanceDisplay();
     renderGaugeState();
+  }
+
+  function startS3Zone2(){
+    stage = 2;
+    legStartM = ballM;
+    s3Vx = 0;
+    collidedWithWall = false;
+    startNewShot();
+    resultEl.textContent = '안전지대1 통과! 이어서 안전지대2로 — 스페이스바로 v0 값을 고정해보세요.';
   }
 
   function startZone2(){
@@ -1994,8 +2078,8 @@
     legStartM = 0;
     ballM = 0;
     s3Vx = 0;
+    s3ButtonPressed = false;
     collidedWithWall = false;
-    s3FallStartTime = null;
     bombOrigin = performance.now();
     hazardSoundState = {};
     updateGaugeLabelsForStage();
@@ -2193,25 +2277,25 @@
     return mainLaneY - s3TerrainHeightM(xM)*scalePx();
   }
 
-  // Ground height to draw the ball at: normally just the terrain height under its
-  // center, but right at the cliff we hold it on the upper plateau until its
-  // LEADING (left) edge has actually crossed the drop, so it visibly grazes the
-  // edge with that edge instead of appearing to fall a half-body-width early.
   function s3BallGroundY(xM){
-    const r = ballR/scalePx();
-    const leftEdge = xM - r;
-    if(!collidedWithWall && leftEdge < S3_X_CLIFF && xM >= S3_X_CLIFF){
-      return groundYAtM(S3_X_CLIFF - 0.001);
-    }
-    if(s3FallStartTime !== null && xM >= S3_X_CLIFF && xM < S3_X_FLAT2_END){
-      // real projectile motion: horizontal speed unchanged (already handled by the
-      // physics update), vertical position free-falls from the ledge height;
-      // clamped at the lower plateau — restitution 0, it simply stops, no bounce
-      const elapsed = (performance.now() - s3FallStartTime) / 1000;
-      const fallHeight = Math.max(S3_HEIGHT_LOWER_PLATEAU, S3_HILL1_RISE - 0.5*GRAVITY_G*elapsed*elapsed);
-      return mainLaneY - fallHeight*scalePx();
-    }
     return groundYAtM(xM);
+  }
+
+  function drawS3Button(){
+    const x1 = mToPx(S3_BUTTON_LEFT);
+    const x2 = mToPx(S3_BUTTON_RIGHT);
+    const yBase = groundYAtM(S3_BUTTON_LEFT); // flat ground level (4.5m) on both sides
+    const topY = yBase - S3_BUTTON_HEIGHT*scalePx();
+    ctx.fillStyle = '#D62E2E';
+    ctx.beginPath();
+    ctx.moveTo(x1, yBase);
+    ctx.lineTo(x2, topY);
+    ctx.lineTo(x2, yBase);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
   }
 
   function drawGrid3(){
@@ -2229,35 +2313,23 @@
 
     // hill fill: the terrain mass that rises above ground level, a different color
     // from the underground so "the hill sitting on top of the ground" reads clearly.
-    // Built from the terrain's exact breakpoints (not sampled) so every straight
-    // segment — including the vertical cliff face — renders with no interpolation
-    // artifacts.
+    // Finely sampled so the smooth hill/valley curves in leg 2 render correctly.
     ctx.fillStyle = '#8A6B4A';
     ctx.beginPath();
     ctx.moveTo(mToPx(firstM), groundYAtM(firstM));
-    const s3Breakpoints = [S3_X_HILL1_START, S3_X_HILL1_END, S3_X_CLIFF, S3_X_FLAT2_END, S3_X_HILL2_END];
-    s3Breakpoints.forEach((bp)=>{
-      if(bp <= firstM || bp >= lastM) return;
-      if(bp === S3_X_CLIFF){
-        const cx = mToPx(bp);
-        ctx.lineTo(cx, groundYAtM(bp - 0.001));
-        ctx.lineTo(cx, groundYAtM(bp + 0.001));
-      } else {
-        ctx.lineTo(mToPx(bp), groundYAtM(bp));
-      }
-    });
+    const sampleStepM = Math.max(0.05, 2/step);
+    for(let m=firstM; m<=lastM; m+=sampleStepM){
+      ctx.lineTo(mToPx(m), groundYAtM(m));
+    }
     ctx.lineTo(mToPx(lastM), groundYAtM(lastM));
     ctx.lineTo(mToPx(lastM), mainLaneY);
     ctx.lineTo(mToPx(firstM), mainLaneY);
     ctx.closePath();
     ctx.fill();
 
-    // cliff face (the restitution-0 wall), drawn as a distinct darker vertical stripe
-    const cliffX = mToPx(S3_X_CLIFF);
-    const cliffTopY = groundYAtM(S3_X_CLIFF - 0.001);
-    const cliffBotY = groundYAtM(S3_X_CLIFF + 0.001);
-    ctx.fillStyle = '#5C4630';
-    ctx.fillRect(cliffX-1.5, cliffTopY, 3, cliffBotY-cliffTopY);
+    if(!s3ButtonPressed){
+      drawS3Button();
+    }
 
     // vertical grid lines
     ctx.strokeStyle = '#DDD6C3';
@@ -2277,9 +2349,8 @@
     // height-above-ground vertical arrows for each flat segment
     const heightLabels = [
       { m: (0 + S3_X_HILL1_START)/2, h: 0 },
-      { m: (S3_X_HILL1_END + S3_X_CLIFF)/2, h: S3_HILL1_RISE },
-      { m: (S3_X_CLIFF + S3_X_FLAT2_END)/2, h: S3_HEIGHT_LOWER_PLATEAU },
-      { m: (S3_X_HILL2_END + S3_WORLD_END_M)/2, h: S3_HEIGHT_HILL2_TOP }
+      { m: (S3_X_HILL1_END + S3_BUTTON_LEFT)/2, h: S3_HILL1_RISE },
+      { m: S3_X_HILL2_END + 1, h: S3_HEIGHT_HILL2_TOP }
     ];
     heightLabels.forEach((lb)=>{
       if(lb.h <= 0) return; // nothing to measure at ground level
@@ -2338,6 +2409,24 @@
       ctx.beginPath(); ctx.moveTo(x+0.5,0); ctx.lineTo(x+0.5,mainLaneY); ctx.stroke();
     }
     for(let y=0;y<=mainLaneY;y+=step){ ctx.beginPath(); ctx.moveTo(0,y+0.5); ctx.lineTo(W,y+0.5); ctx.stroke(); }
+  }
+
+  function drawZone3(leftM, rightM, bottomHeightM, heightM, label){
+    const x1 = mToPx(leftM), x2 = mToPx(rightM);
+    if(x2 < 0 || x1 > W) return;
+    const zoneBottom = mainLaneY - bottomHeightM*scalePx();
+    const zoneHeight = heightM*scalePx();
+    const zoneTop = zoneBottom - zoneHeight;
+    ctx.fillStyle = 'rgba(31,138,110,0.14)';
+    ctx.fillRect(x1, zoneTop, x2-x1, zoneHeight);
+    ctx.strokeStyle = '#1F8A6E';
+    ctx.setLineDash([4,3]);
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x1, zoneTop, x2-x1, zoneHeight);
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#1F8A6E';
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.fillText(label, (x1+x2)/2-18, zoneTop-8);
   }
 
   function drawZone(leftM, rightM, label){
@@ -3038,6 +3127,23 @@
     ctx.restore();
   }
 
+  function drawSmokePuff(cx, groundY, progress){
+    const maxRM = 2;
+    const r = maxRM * Math.sqrt(progress) * scalePx();
+    if(r < 1) return;
+    const alpha = 0.5 * (1-progress);
+    if(alpha <= 0.01) return;
+    const cy = groundY - r*0.3;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    grad.addColorStop(0, `rgba(60,55,52,${alpha})`);
+    grad.addColorStop(0.6, `rgba(60,55,52,${alpha*0.6})`);
+    grad.addColorStop(1, 'rgba(60,55,52,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r, r*0.75, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+
   function drawHazard(bomb){
     const hz = bomb.hz;
     if(!hz) return;
@@ -3127,30 +3233,48 @@
         ctx.restore();
       }
     } else {
+      const activeTotal = hz.count * hz.segDurationSec;
+      const cycle = activeTotal + hz.pauseSec;
+      const elapsed = ((now - bombOrigin)/1000) % cycle;
+      const smokeWindow = 2*hz.segDurationSec; // lasts from ignition through the next bomb's own turn, then fades away
       for(let i=0;i<hz.count;i++){
         const segStartM = hz.baseM + i*hz.segLenM;
         const segEndM = segStartM + hz.segLenM;
         const isActive = bomb.active && bomb.idx === i;
+        const tSinceIgnite = elapsed - i*hz.segDurationSec;
+        if(tSinceIgnite >= 0 && tSinceIgnite < smokeWindow){
+          const cxR = mToPx((segStartM+segEndM)/2);
+          const groundYR = (gameStage === 3) ? groundYAtM((segStartM+segEndM)/2) : mainLaneY;
+          drawSmokePuff(cxR, groundYR, tSinceIgnite/smokeWindow);
+        }
         if(isActive){
           const x1 = mToPx(segStartM), x2 = mToPx(segEndM);
           const segWidth = x2-x1;
-          const groundYSeg = (gameStage === 3) ? groundYAtM((segStartM+segEndM)/2) : mainLaneY;
-          const flameCenterYSeg = groundYSeg - heightPx/2;
+          const segCenterM = (segStartM+segEndM)/2;
+          const groundYSeg = (gameStage === 3) ? groundYAtM(segCenterM) : mainLaneY;
+          const angle = (gameStage === 3) ? s3SlopeAngleAt(segCenterM) : 0;
+          const cxSeg = (x1+x2)/2;
           const cols = Math.max(1, Math.round(segWidth/(burstR*1.3)));
           const colWidth = segWidth/cols;
-          const fireR = Math.min(burstR, colWidth/3.6);
           const midIndex = Math.floor(cols/2);
+          // the center burst is drawn 3x bigger; size everything off how much room it has
+          // to the segment's edges (it sits at local x=0, so that's just segWidth/2) plus
+          // its own internal 1.3x growth — so nothing ever touches the clip edge.
+          const fireR = Math.min(burstR, colWidth/5.5, (segWidth/2)/(3*1.3*1.05));
+          const flameCenterYLocal = -fireR*0.4; // sit low, right against the ground/slope instead of floating
           ctx.save();
+          ctx.translate(cxSeg, groundYSeg);
+          ctx.rotate(angle);
           ctx.beginPath();
-          ctx.rect(x1, 0, segWidth, groundYSeg);
+          ctx.rect(-segWidth/2, -(mainLaneY+50), segWidth, mainLaneY+50);
           ctx.clip();
           for(let c=0; c<cols; c++){
             if(c === midIndex) continue;
-            const bx = x1 + segWidth*((c+0.5)/cols);
-            drawFireBurstIntense(bx, flameCenterYSeg, fireR, now, i*13+c*3, bomb.segProgress);
+            const bxLocal = segWidth*((c+0.5)/cols) - segWidth/2;
+            drawFireBurstIntense(bxLocal, flameCenterYLocal, fireR, now, i*13+c*3, bomb.segProgress);
           }
-          const midBx = x1 + segWidth*((midIndex+0.5)/cols);
-          drawFireBurstIntense(midBx, flameCenterYSeg, fireR*3, now, i*13+midIndex*3, bomb.segProgress);
+          const midBxLocal = segWidth*((midIndex+0.5)/cols) - segWidth/2;
+          drawFireBurstIntense(midBxLocal, flameCenterYLocal, fireR*3, now, i*13+midIndex*3, bomb.segProgress);
           ctx.restore();
         }
       }
@@ -3346,7 +3470,16 @@
     const cfg = currentStageCfg();
     Object.keys(ACTIVE_ZONES).forEach((key)=>{
       const z = ACTIVE_ZONES[key];
-      drawZone(z.targetLeftM, z.targetRightM, z.targetName);
+      if(gameStage === 3){
+        if(key === '2'){
+          const zoneBottom2 = Math.min(S3_HEIGHT_HILLA_TOP, S3_HEIGHT_HILLB_TOP);
+          drawZone3(S3_X_HILLA_TOP, S3_X_HILLB_TOP, zoneBottom2, 3, z.targetName);
+        } else {
+          drawZone3(S3_X_HILL1_END, S3_X_HILL2_END, S3_HILL1_RISE, 3, z.targetName);
+        }
+      } else {
+        drawZone(z.targetLeftM, z.targetRightM, z.targetName);
+      }
     });
     if(gameStage === 2){
       drawShield(nowTs);
@@ -3483,16 +3616,30 @@
     function mapX(m){
       return pad + Math.min(1, Math.max(0, m/worldEndM)) * usableW;
     }
+    const riseRange = mmH*0.4;
+    function mapY(m){
+      if(gameStage !== 3) return lineY;
+      return lineY - (s3TerrainHeightM(Math.max(0,m))/S3_MAX_HEIGHT)*riseRange;
+    }
 
     ctx.strokeStyle = '#B7AD95'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(mapX(0), lineY); ctx.lineTo(mapX(worldEndM), lineY); ctx.stroke();
+    ctx.beginPath();
+    if(gameStage === 3){
+      const bps = [0, S3_X_HILL1_START, S3_X_HILL1_END, S3_BUTTON_LEFT, S3_BUTTON_RIGHT, S3_X_FLAT2_END, S3_X_HILL2_END, S3_X_FLAT3_END, S3_X_HILLA_TOP, S3_X_VALLEY_FLAT_START, S3_X_VALLEY_FLAT_END, S3_X_HILLB_TOP, S3_X_HILLB_DOWN_END, worldEndM];
+      ctx.moveTo(mapX(bps[0]), mapY(bps[0]));
+      bps.slice(1).forEach(bp => ctx.lineTo(mapX(bp), mapY(bp)));
+    } else {
+      ctx.moveTo(mapX(0), lineY); ctx.lineTo(mapX(worldEndM), lineY);
+    }
+    ctx.stroke();
 
     const zoneKeys = Object.keys(ACTIVE_ZONES).map(Number).sort((a,b)=>a-b);
     zoneKeys.forEach((k)=>{
       const z = ACTIVE_ZONES[k];
       const zx1 = mapX(z.targetLeftM), zx2 = mapX(z.targetRightM);
+      const zy = mapY((z.targetLeftM+z.targetRightM)/2);
       ctx.fillStyle = '#1F8A6E';
-      ctx.fillRect(zx1, lineY-Math.max(2,mmH*0.1), Math.max(2, zx2-zx1), Math.max(4,mmH*0.2));
+      ctx.fillRect(zx1, zy-Math.max(2,mmH*0.1), Math.max(2, zx2-zx1), Math.max(4,mmH*0.2));
     });
 
     // distance labels between consecutive safe zones
@@ -3506,9 +3653,10 @@
       const centerB = (zB.targetLeftM + zB.targetRightM) / 2;
       const gapM = centerB - centerA;
       const midX = (mapX(zA.targetRightM) + mapX(zB.targetLeftM)) / 2;
+      const midY = mapY((zA.targetRightM + zB.targetLeftM)/2);
       const label = Math.round(gapM) + 'm';
       const tw = ctx.measureText(label).width;
-      ctx.fillText(label, midX - tw/2, lineY - mmH*0.2);
+      ctx.fillText(label, midX - tw/2, midY - mmH*0.2);
     }
 
     // real-time bomb explosion markers (red)
@@ -3520,42 +3668,61 @@
         ctx.fillStyle = 'rgba(214,40,30,0.92)';
         if(b.type === 'sweep'){
           const fx = mapX(b.frontM);
-          ctx.beginPath(); ctx.arc(fx, lineY, Math.max(2,mmH*0.1), 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(fx, mapY(b.frontM), Math.max(2,mmH*0.1), 0, Math.PI*2); ctx.fill();
         } else if(b.type === 'area'){
           const x1 = mapX(b.hz.startM), x2 = mapX(b.hz.endM);
-          ctx.fillRect(x1, lineY-segH/2, Math.max(2,x2-x1), segH);
+          const y = mapY((b.hz.startM+b.hz.endM)/2);
+          ctx.fillRect(x1, y-segH/2, Math.max(2,x2-x1), segH);
         } else if(b.type === 'missile' || b.type === 'meteor'){
           b.missiles.forEach((m)=>{
             if(!m.absorbed && m.progress >= MISSILE_FALL_FRAC){
               const mx = mapX(m.impactM);
-              ctx.beginPath(); ctx.arc(mx, lineY, Math.max(2,mmH*0.1), 0, Math.PI*2); ctx.fill();
+              ctx.beginPath(); ctx.arc(mx, mapY(m.impactM), Math.max(2,mmH*0.1), 0, Math.PI*2); ctx.fill();
             }
           });
         } else if(b.type === 'nukes' && b.simultaneous){
           b.segs.forEach((s)=>{
             const sx1 = mapX(s.segStartM), sx2 = mapX(s.segEndM);
-            ctx.fillRect(sx1, lineY-segH/2, Math.max(2,sx2-sx1), segH);
+            const sy = mapY((s.segStartM+s.segEndM)/2);
+            ctx.fillRect(sx1, sy-segH/2, Math.max(2,sx2-sx1), segH);
           });
         } else {
           const x1 = mapX(b.segStartM), x2 = mapX(b.segEndM);
-          ctx.fillRect(x1, lineY-segH/2, Math.max(2,x2-x1), segH);
+          const y = mapY((b.segStartM+b.segEndM)/2);
+          ctx.fillRect(x1, y-segH/2, Math.max(2,x2-x1), segH);
         }
       });
     }
 
     ctx.fillStyle = '#6B6459';
-    ctx.beginPath(); ctx.arc(mapX(0), lineY, Math.max(1.5, mmH*0.06), 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(mapX(0), mapY(0), Math.max(1.5, mmH*0.06), 0, Math.PI*2); ctx.fill();
 
     // item marker (gold)
     if(gameStage === 1 && !sedativeCollected){
       const ix = mapX(SEDATIVE_M);
       ctx.fillStyle = '#F0B429';
-      ctx.beginPath(); ctx.arc(ix, lineY, Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ix, mapY(SEDATIVE_M), Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
       ctx.strokeStyle = '#8A5F0E'; ctx.lineWidth = 1; ctx.stroke();
     }
 
+    // stage2: mud lump (object C) and object B markers
+    if(gameStage === 2){
+      if(!collidedWithMud){
+        const mx = mapX(S2_MUD_M);
+        ctx.fillStyle = '#7A5230';
+        ctx.beginPath(); ctx.arc(mx, mapY(S2_MUD_M), Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#4A3018'; ctx.lineWidth = 1; ctx.stroke();
+      }
+      if(objectBActive){
+        const bx = mapX(objectBM);
+        ctx.fillStyle = '#B94A4A';
+        ctx.beginPath(); ctx.arc(bx, mapY(objectBM), Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#242220'; ctx.lineWidth = 1; ctx.stroke();
+      }
+    }
+
     ctx.fillStyle = currentColor;
-    ctx.beginPath(); ctx.arc(mapX(Math.max(0, ballM)), lineY, Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(mapX(Math.max(0, ballM)), mapY(Math.max(0,ballM)), Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle = '#242220'; ctx.lineWidth = 1; ctx.stroke();
   }
 
@@ -3766,7 +3933,6 @@
     pinkShieldFadeStart = null;
     collidedWithMud = false;
     collidedWithWall = false;
-    s3FallStartTime = null;
     if(sedativeBtn) sedativeBtn.style.display = 'none';
     if(sedativeStatusEl) sedativeStatusEl.classList.remove('show');
     gameStage = 1;
@@ -3822,49 +3988,37 @@
       } else if(mode === 'flying'){
         if(gameStage === 3){
           const ballR_m3 = ballR/scalePx();
-          const willHitCliffWall = (ballM - ballR_m3 > S3_X_CLIFF) && (s3Vx < 0) && ((ballM + s3Vx*dt) - ballR_m3 <= S3_X_CLIFF);
-          if(willHitCliffWall){
-            ballM = S3_X_CLIFF + ballR_m3;
+          const willHitButtonWall = (stage === 1) && (ballM - ballR_m3 > S3_BUTTON_RIGHT) && (s3Vx < 0) && ((ballM + s3Vx*dt) - ballR_m3 <= S3_BUTTON_RIGHT);
+          if(willHitButtonWall){
+            ballM = S3_BUTTON_RIGHT + ballR_m3;
             s3Vx = 0;
             flightV = 0;
             collidedWithWall = true;
             mode = 'resting';
             resultEl.className = 'result success';
-            resultEl.textContent = '절벽 벽에 충돌했습니다! 잠시 후 스테이지가 클리어됩니다…';
+            resultEl.textContent = '안전지대1 도착! 곧바로 2단계로 이동합니다…';
             mainBtn.disabled = true;
-            mainBtn.textContent = '\u00A0';
+            mainBtn.textContent = '2단계로 자동 이동 중…';
             mainBtn.onclick = null;
             playWallImpactSound();
-            setTimeout(()=>{
-              clearedStages.push(3);
-              showStageClearOverlay('stage3: 언덕의 구역 클리어', '처음부터 시작', fullReset);
-            }, 1000);
+            setTimeout(()=>{ if(mode === 'resting' && stage === 1) startS3Zone2(); }, 900);
           } else {
             const cosBefore = s3CosThetaAt(ballM);
             const ax = s3AccelAt(ballM);
             s3Vx += ax*dt;
-            const ballR_m3b = ballR/scalePx();
-            const prevLeftEdge3 = ballM - ballR_m3b;
             ballM += s3Vx*dt;
-            const newLeftEdge3 = ballM - ballR_m3b;
-            if(s3FallStartTime === null && prevLeftEdge3 < S3_X_CLIFF && newLeftEdge3 >= S3_X_CLIFF && s3Vx > 0){
-              s3FallStartTime = performance.now();
-            }
             const cosAfter = s3CosThetaAt(ballM);
             if(cosAfter !== cosBefore){
               // entering/leaving an incline: rescale so the TRUE speed (not just its
               // horizontal component) stays continuous across the slope-angle change
               s3Vx = s3Vx * (cosAfter/cosBefore);
             }
-            // falling off the ledge: gravity only acts vertically during the drop, so
-            // the horizontal speed carries over completely unchanged — the fall's
-            // vertical speed is absorbed by the ground on landing and never
-            // contributes to horizontal motion.
             flightV = Math.abs(s3Vx);
             if(ballM < -3 || ballM > S3_WORLD_END_M){
               triggerBoundaryGameOver();
             }
           }
+          s3ButtonPressed = (ballM + ballR_m3 > S3_BUTTON_LEFT) && (ballM - ballR_m3 < S3_BUTTON_RIGHT);
         } else {
         ballM += flightV*dt;
         flightV = Math.max(0, flightV - flightDecel*dt);
