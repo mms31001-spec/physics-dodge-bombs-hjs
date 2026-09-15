@@ -829,12 +829,24 @@
   const MARGIN = 50;
   const USABLE = W - MARGIN*2;
   const GROUND_HEIGHT_PX = (H/2) * (2/3);
-  const mainLaneY = H - GROUND_HEIGHT_PX;
+  let mainLaneY = H - GROUND_HEIGHT_PX;
+  const DEFAULT_MAIN_LANE_Y = H - GROUND_HEIGHT_PX;
   const worldLaneYs = [180, 230, 280, 330];
   let ballR = 8; // recomputed every frame so the ball is always a fixed 0.7m square on screen
   const BALL_SIZE_M = 0.7;
   function updateBallR(){
     ballR = (BALL_SIZE_M/2) * scalePx();
+  }
+  // keeps the ball vertically centered on screen in stage3 while it's moving (or
+  // frozen at the moment it's hit), instead of the ball drifting up/down as the
+  // terrain height changes under a fixed ground line
+  function updateMainLaneY(){
+    if(gameStage === 3 && (mode === 'flying' || mode === 'resting' || mode === 'exploding' || mode === 'gameover')){
+      const ballHeightM = s3TerrainHeightM(ballM);
+      mainLaneY = H/2 + ballHeightM*scalePx();
+    } else {
+      mainLaneY = DEFAULT_MAIN_LANE_Y;
+    }
   }
   const MASS = 2; // kg, fixed ball mass
   const GRAVITY_G = 10; // m/s^2
@@ -1039,19 +1051,26 @@
 
   const S3_HILLA_RUN_UP = 10;
   const S3_X_HILLA_TOP = S3_X_FLAT3_END + S3_HILLA_RUN_UP; // 46
-  const S3_HILLA_RISE = 19.5;
+  const S3_HILLA_RISE = 18.5;
   const S3_HEIGHT_HILLA_TOP = S3_HEIGHT_HILL2_TOP + S3_HILLA_RISE; // 25
 
   const S3_VALLEY_FLAT_HALFLEN = 1;
   const S3_HILLA_RUN_DOWN = 5 - S3_VALLEY_FLAT_HALFLEN; // 4 (5m from hillA top to valley center, minus the 1m half-flat)
   const S3_X_VALLEY_FLAT_START = S3_X_HILLA_TOP + S3_HILLA_RUN_DOWN; // 50
-  const S3_VALLEY_DROP = 10;
-  const S3_HEIGHT_VALLEY = S3_HEIGHT_HILLA_TOP - S3_VALLEY_DROP; // 15
-  const S3_X_VALLEY_FLAT_END = S3_X_VALLEY_FLAT_START + S3_VALLEY_FLAT_HALFLEN*2; // 52
+  const S3_VALLEY_DROP = 7; // raised 3m from the original 10m drop, while both hilltop heights stay put
+  const S3_HEIGHT_VALLEY = S3_HEIGHT_HILLA_TOP - S3_VALLEY_DROP; // 17
+  const S3_VALLEY_FLAT_RIGHT_EXTRA = 1; // widens the valley floor by 1m, shifting hill B (and everything past it) 1m right
+  const S3_X_VALLEY_FLAT_END = S3_X_VALLEY_FLAT_START + S3_VALLEY_FLAT_HALFLEN*2 + S3_VALLEY_FLAT_RIGHT_EXTRA; // 53
+
+  // second button: identical mechanic to the first, sitting 1m in from the left edge
+  // of the valley floor.
+  const S3_BUTTON2_LEFT = S3_X_VALLEY_FLAT_START + 1; // 51
+  const S3_BUTTON2_RIGHT = S3_BUTTON2_LEFT + S3_BUTTON_HEIGHT; // 51.5
+  let s3Button2Pressed = false;
 
   const S3_HILLB_RUN_UP = 5 - S3_VALLEY_FLAT_HALFLEN; // 4
-  const S3_X_HILLB_TOP = S3_X_VALLEY_FLAT_END + S3_HILLB_RUN_UP; // 56
-  const S3_HEIGHT_HILLB_TOP = S3_HEIGHT_HILL2_TOP + 20.5; // 26
+  const S3_X_HILLB_TOP = S3_X_VALLEY_FLAT_END + S3_HILLB_RUN_UP; // 57
+  const S3_HEIGHT_HILLB_TOP = S3_HEIGHT_HILL2_TOP + 19.5; // 25
 
   const S3_HILLB_RUN_DOWN = 5;
   const S3_X_HILLB_DOWN_END = S3_X_HILLB_TOP + S3_HILLB_RUN_DOWN; // 61
@@ -1093,7 +1112,13 @@
       const t = (xM - S3_X_HILLA_TOP) / S3_HILLA_RUN_DOWN;
       return S3_HEIGHT_HILLA_TOP - s3SmoothRamp(t)*S3_VALLEY_DROP;
     }
-    if(xM < S3_X_VALLEY_FLAT_END) return S3_HEIGHT_VALLEY;
+    if(xM < S3_X_VALLEY_FLAT_END){
+      if(!s3Button2Pressed && xM >= S3_BUTTON2_LEFT && xM < S3_BUTTON2_RIGHT){
+        const t = (xM - S3_BUTTON2_LEFT) / S3_BUTTON_HEIGHT;
+        return S3_HEIGHT_VALLEY + t*S3_BUTTON_HEIGHT;
+      }
+      return S3_HEIGHT_VALLEY;
+    }
     if(xM < S3_X_HILLB_TOP){
       const t = (xM - S3_X_VALLEY_FLAT_END) / S3_HILLB_RUN_UP;
       return S3_HEIGHT_VALLEY + s3SmoothRamp(t)*(S3_HEIGHT_HILLB_TOP - S3_HEIGHT_VALLEY);
@@ -1152,13 +1177,13 @@
   }
 
   const QUANTITIES_STAGE1 = [
-    {key:'v0', label:'초기속도 v0', min:0, max:20, step:5, decimals:2, speed:1/3, unit:'m/s'}
+    {key:'v0', label:'초기속도 v0', min:0, max:25, step:5, decimals:2, speed:1/3, unit:'m/s'}
   ];
   const QUANTITIES_STAGE2 = [
-    {key:'v0', label:'초기속도 v0', min:0, max:20, step:5, decimals:2, speed:1/3, unit:'m/s'}
+    {key:'v0', label:'초기속도 v0', min:0, max:25, step:5, decimals:2, speed:1/3, unit:'m/s'}
   ];
   const QUANTITIES_STAGE3 = [
-    {key:'v0', label:'초기속도 v0', min:0, max:20, step:5, decimals:2, speed:1/3, unit:'m/s'}
+    {key:'v0', label:'초기속도 v0', min:0, max:25, step:5, decimals:2, speed:1/3, unit:'m/s'}
   ];
 
   const STAGE3_ZONES = {
@@ -1167,12 +1192,19 @@
       hazard: {type:'segments', baseM:1, segLenM:14/10, count:10, segDurationSec:0.25, pauseSec:1.2}
     },
     2: {
-      targetLeftM: S3_X_HILLA_TOP, targetRightM: S3_X_HILLB_TOP, targetName: '안전지대2'
+      targetLeftM: S3_X_HILLA_TOP, targetRightM: S3_X_HILLB_TOP, targetName: '안전지대2',
+      hazards: [
+        {type:'segments', baseM:S3_X_HILL2_END, segLenM:(S3_X_HILLA_TOP-S3_X_HILL2_END)/20, count:20, segDurationSec:0.2, pauseSec:2},
+        {type:'nukes', baseM:S3_X_HILLB_TOP, segLenM:((S3_X_HILLB_DOWN_END+10)-S3_X_HILLB_TOP)/10, count:10, segDurationSec:0.5, simultaneous:true, period:1.5}
+      ]
     }
   };
   const STAGE3_VIEWS = {
     1: { startM: 0, spanM: (S3_X_HILL2_END + 4 + 3) / 1.2 },
-    2: { startM: S3_X_HILL1_END, spanM: (S3_WORLD_END_M - S3_X_HILL1_END + 3) / 1.2 }
+    2: { startM: S3_X_HILL1_END, spanM: Math.max(
+      (S3_WORLD_END_M - S3_X_HILL1_END + 3) / 1.2,
+      ((S3_MAX_HEIGHT + 5) / mainLaneY) * USABLE
+    ) }
   };
 
   let gameStage = 1;
@@ -1363,7 +1395,8 @@
 
   function currentStageCfg(){ return ACTIVE_ZONES[stage]; }
   function currentHazardStartM(){
-    const hz = currentStageCfg().hazard;
+    const cfg = currentStageCfg();
+    const hz = cfg.hazards ? cfg.hazards[0] : cfg.hazard;
     if(!hz) return 0;
     return (hz.type === 'sweep' || hz.type === 'area' || hz.type === 'missile' || hz.type === 'meteor') ? hz.startM : hz.baseM;
   }
@@ -2079,6 +2112,7 @@
     ballM = 0;
     s3Vx = 0;
     s3ButtonPressed = false;
+    s3Button2Pressed = false;
     collidedWithWall = false;
     bombOrigin = performance.now();
     hazardSoundState = {};
@@ -2241,7 +2275,14 @@
   function getBombState(now){
     const result = {};
     Object.keys(ACTIVE_ZONES).forEach((key)=>{
-      result[key] = evalHazard(ACTIVE_ZONES[key].hazard, now);
+      const zone = ACTIVE_ZONES[key];
+      if(zone.hazards){
+        zone.hazards.forEach((hz, i)=>{
+          result[key+'_'+i] = evalHazard(hz, now);
+        });
+      } else if(zone.hazard){
+        result[key] = evalHazard(zone.hazard, now);
+      }
     });
     return result;
   }
@@ -2281,10 +2322,10 @@
     return groundYAtM(xM);
   }
 
-  function drawS3Button(){
-    const x1 = mToPx(S3_BUTTON_LEFT);
-    const x2 = mToPx(S3_BUTTON_RIGHT);
-    const yBase = groundYAtM(S3_BUTTON_LEFT); // flat ground level (4.5m) on both sides
+  function drawS3Button(leftM, rightM){
+    const x1 = mToPx(leftM);
+    const x2 = mToPx(rightM);
+    const yBase = groundYAtM(leftM); // flat ground level on both sides
     const topY = yBase - S3_BUTTON_HEIGHT*scalePx();
     ctx.fillStyle = '#D62E2E';
     ctx.beginPath();
@@ -2311,10 +2352,10 @@
     ctx.fillStyle = '#6B4F36';
     ctx.fillRect(0, mainLaneY, W, H-mainLaneY);
 
-    // hill fill: the terrain mass that rises above ground level, a different color
-    // from the underground so "the hill sitting on top of the ground" reads clearly.
+    // hill fill: the terrain mass that rises above ground level. Two tones: the
+    // familiar brown up to the hill1-hill2 plateau height (4.5m), and a cooler
+    // "high ground" tone for anything above that reference plane.
     // Finely sampled so the smooth hill/valley curves in leg 2 render correctly.
-    ctx.fillStyle = '#8A6B4A';
     ctx.beginPath();
     ctx.moveTo(mToPx(firstM), groundYAtM(firstM));
     const sampleStepM = Math.max(0.05, 2/step);
@@ -2325,10 +2366,32 @@
     ctx.lineTo(mToPx(lastM), mainLaneY);
     ctx.lineTo(mToPx(firstM), mainLaneY);
     ctx.closePath();
+    ctx.fillStyle = '#7D7266';
     ctx.fill();
+    ctx.save();
+    ctx.clip();
+    const refY = mainLaneY - S3_HILL1_RISE*scalePx();
+    ctx.fillStyle = '#8A6B4A';
+    ctx.fillRect(0, refY, W, mainLaneY-refY);
+    ctx.restore();
 
     if(!s3ButtonPressed){
-      drawS3Button();
+      drawS3Button(S3_BUTTON_LEFT, S3_BUTTON_RIGHT);
+    }
+    if(!s3Button2Pressed){
+      drawS3Button(S3_BUTTON2_LEFT, S3_BUTTON2_RIGHT);
+    }
+
+    if(stage === 2 && (mode === 'aiming' || mode === 'locked')){
+      const refLineY = mainLaneY - S3_HILL1_RISE*scalePx();
+      ctx.strokeStyle = '#242220';
+      ctx.setLineDash([5,4]);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(mToPx(ballM), refLineY);
+      ctx.lineTo(mToPx(lastM), refLineY);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     // vertical grid lines
@@ -2348,16 +2411,22 @@
 
     // height-above-ground vertical arrows for each flat segment
     const heightLabels = [
-      { m: (0 + S3_X_HILL1_START)/2, h: 0 },
-      { m: (S3_X_HILL1_END + S3_BUTTON_LEFT)/2, h: S3_HILL1_RISE },
-      { m: S3_X_HILL2_END + 1, h: S3_HEIGHT_HILL2_TOP }
+      { m: (0 + S3_X_HILL1_START)/2, h: 0, refH: 0 }
     ];
+    if(stage !== 2){
+      heightLabels.push({ m: (S3_X_HILL1_END + S3_BUTTON_LEFT)/2, h: S3_HILL1_RISE, refH: 0 });
+      heightLabels.push({ m: S3_X_HILL2_END + 1, h: S3_HEIGHT_HILL2_TOP, refH: 0 });
+    }
+    heightLabels.push({ m: S3_X_HILLA_TOP, h: S3_HEIGHT_HILLA_TOP, refH: S3_HILL1_RISE });
+    heightLabels.push({ m: S3_X_HILLB_TOP, h: S3_HEIGHT_HILLB_TOP, refH: S3_HILL1_RISE });
     heightLabels.forEach((lb)=>{
-      if(lb.h <= 0) return; // nothing to measure at ground level
+      const refH = lb.refH || 0;
+      const displayH = lb.h - refH;
+      if(displayH <= 0) return; // nothing to measure at the reference plane
       const x = mToPx(lb.m);
       if(x < -20 || x > W+20) return;
       const yTop = groundYAtM(lb.m);
-      const yBottom = mainLaneY;
+      const yBottom = mainLaneY - refH*scalePx();
       if(yBottom - yTop < 6) return; // too short to draw meaningfully
 
       ctx.strokeStyle = '#FFFFFF';
@@ -2378,7 +2447,7 @@
 
       // height label at the midpoint, with a small background so it stays readable over the arrow
       const midY = (yTop+yBottom)/2;
-      const label = lb.h.toFixed(1)+'m';
+      const label = displayH.toFixed(1)+'m';
       ctx.font = '800 14px -apple-system, sans-serif';
       const tw = ctx.measureText(label).width;
       ctx.fillStyle = '#F7F4EC';
@@ -2411,7 +2480,7 @@
     for(let y=0;y<=mainLaneY;y+=step){ ctx.beginPath(); ctx.moveTo(0,y+0.5); ctx.lineTo(W,y+0.5); ctx.stroke(); }
   }
 
-  function drawZone3(leftM, rightM, bottomHeightM, heightM, label){
+  function drawZone3(leftM, rightM, bottomHeightM, heightM, label, labelInside){
     const x1 = mToPx(leftM), x2 = mToPx(rightM);
     if(x2 < 0 || x1 > W) return;
     const zoneBottom = mainLaneY - bottomHeightM*scalePx();
@@ -2426,7 +2495,7 @@
     ctx.setLineDash([]);
     ctx.fillStyle = '#1F8A6E';
     ctx.font = '11px -apple-system, sans-serif';
-    ctx.fillText(label, (x1+x2)/2-18, zoneTop-8);
+    ctx.fillText(label, (x1+x2)/2-18, labelInside ? zoneTop+14 : zoneTop-8);
   }
 
   function drawZone(leftM, rightM, label){
@@ -3170,11 +3239,12 @@
             const x1 = mToPx(s.segStartM), x2 = mToPx(s.segEndM);
             const segWidth = x2-x1;
             const cx = (x1+x2)/2;
+            const groundYSegN = (gameStage === 3) ? groundYAtM((s.segStartM+s.segEndM)/2) : mainLaneY;
             ctx.save();
             ctx.beginPath();
-            ctx.rect(x1, 0, segWidth, mainLaneY);
+            ctx.rect(x1, 0, segWidth, groundYSegN);
             ctx.clip();
-            drawMushroomCloud(cx, mainLaneY, segWidth, s.segProgress, s.idx*2.3);
+            drawMushroomCloud(cx, groundYSegN, segWidth, s.segProgress, s.idx*2.3);
             ctx.restore();
           });
         }
@@ -3472,8 +3542,9 @@
       const z = ACTIVE_ZONES[key];
       if(gameStage === 3){
         if(key === '2'){
-          const zoneBottom2 = Math.min(S3_HEIGHT_HILLA_TOP, S3_HEIGHT_HILLB_TOP);
-          drawZone3(S3_X_HILLA_TOP, S3_X_HILLB_TOP, zoneBottom2, 3, z.targetName);
+          const zoneTop2 = S3_HEIGHT_HILLB_TOP;
+          const zoneBottom2 = S3_HEIGHT_VALLEY;
+          drawZone3(S3_X_HILLA_TOP, S3_X_HILLB_TOP, zoneBottom2, zoneTop2 - zoneBottom2, z.targetName, true);
         } else {
           drawZone3(S3_X_HILL1_END, S3_X_HILL2_END, S3_HILL1_RISE, 3, z.targetName);
         }
@@ -3972,6 +4043,7 @@
     const dt = Math.min((now-lastFrameTime)/1000, 0.032);
     lastFrameTime = now;
     updateBallR();
+    updateMainLaneY();
 
     if(gameStage === 1 && sedativeCollected && !sedativeUsed && !gamePausedForItem){
       sedativeBtn.style.display = (mode === 'aiming') ? 'flex' : 'none';
@@ -3989,6 +4061,7 @@
         if(gameStage === 3){
           const ballR_m3 = ballR/scalePx();
           const willHitButtonWall = (stage === 1) && (ballM - ballR_m3 > S3_BUTTON_RIGHT) && (s3Vx < 0) && ((ballM + s3Vx*dt) - ballR_m3 <= S3_BUTTON_RIGHT);
+          const willHitButton2Wall = (ballM - ballR_m3 > S3_BUTTON2_RIGHT) && (s3Vx < 0) && ((ballM + s3Vx*dt) - ballR_m3 <= S3_BUTTON2_RIGHT);
           if(willHitButtonWall){
             ballM = S3_BUTTON_RIGHT + ballR_m3;
             s3Vx = 0;
@@ -4002,6 +4075,22 @@
             mainBtn.onclick = null;
             playWallImpactSound();
             setTimeout(()=>{ if(mode === 'resting' && stage === 1) startS3Zone2(); }, 900);
+          } else if(willHitButton2Wall){
+            ballM = S3_BUTTON2_RIGHT + ballR_m3;
+            s3Vx = 0;
+            flightV = 0;
+            collidedWithWall = true;
+            mode = 'resting';
+            resultEl.className = 'result success';
+            resultEl.textContent = '버튼 벽에 충돌했습니다! 잠시 후 스테이지가 클리어됩니다…';
+            mainBtn.disabled = true;
+            mainBtn.textContent = '\u00A0';
+            mainBtn.onclick = null;
+            playWallImpactSound();
+            setTimeout(()=>{
+              clearedStages.push(3);
+              showStageClearOverlay('stage3: 언덕의 구역 클리어', '처음부터 시작', fullReset);
+            }, 1000);
           } else {
             const cosBefore = s3CosThetaAt(ballM);
             const ax = s3AccelAt(ballM);
@@ -4019,6 +4108,7 @@
             }
           }
           s3ButtonPressed = (ballM + ballR_m3 > S3_BUTTON_LEFT) && (ballM - ballR_m3 < S3_BUTTON_RIGHT);
+          s3Button2Pressed = (ballM + ballR_m3 > S3_BUTTON2_LEFT) && (ballM - ballR_m3 < S3_BUTTON2_RIGHT);
         } else {
         ballM += flightV*dt;
         flightV = Math.max(0, flightV - flightDecel*dt);
