@@ -776,7 +776,7 @@
           <button type="button" class="sound-btn" id="soundBtn" aria-label="사운드">🔈</button>
           <button type="button" class="back-btn" id="backToSelectBtn">돌아가기</button>
         </div>
-        <div class="mass-badge" id="massBadge"><span id="gravityLine" style="display:none;">중력가속도=<b class="mono">10m/s²</b><br></span><span id="frictionLine" style="display:none;">마찰력=<b class="mono">4N</b><br></span>물체 질량=<b class="mono">2kg</b><br>눈금 한 칸=<b class="mono">1m</b></div>
+        <div class="mass-badge" id="massBadge"><span id="gravityLine" style="display:none;">중력가속도=<b class="mono">10m/s²</b><br></span><span id="frictionLine" style="display:none;">마찰력=<b class="mono">4N</b><br></span>물체 질량=<b class="mono">2kg</b><br>눈금 한 칸=<b class="mono">1m</b><span id="s2CollisionLegend" style="display:none;"><br><span style="display:inline-block;width:14px;height:14px;background:#B94A4A;border:1px solid #242220;vertical-align:middle;"></span> → 탄성충돌<br><svg width="20" height="12" viewBox="0 0 40 24" style="vertical-align:middle;"><ellipse cx="20" cy="15" rx="13" ry="7.5" fill="#7A5230"/><ellipse cx="12" cy="17" rx="8.1" ry="5.8" fill="#7A5230"/><ellipse cx="28" cy="17" rx="7.6" ry="5.8" fill="#7A5230"/><ellipse cx="16" cy="10" rx="7.2" ry="4.7" fill="#8E6440" transform="rotate(-11 16 10)"/><ellipse cx="20" cy="15" rx="13" ry="7.5" fill="none" stroke="rgba(50,32,18,0.5)" stroke-width="1"/></svg> → 완전비탄성 충돌</span></div>
       </div>
       <div class="play-timer"><span id="playTimer">00:00</span> · <span id="playDistance">0.0 m</span></div>
       <div class="sedative-status" id="sedativeStatus">신경안정제 사용 중</div>
@@ -934,11 +934,20 @@
   let objectBM = 0;
   let objectBV = 0;
   let objectBSinking = false;
+  let ballSinking = false;
+  let ballSinkStart = null;
   let objectBSinkStart = 0;
-  let pitFilled = false;
-  let bombZoneTriggered = false;
-  let bombZoneTriggerTime = null;
-  let pinkShieldFadeStart = null;
+  let objectBExploded = false;
+  let s2TrackObjectB = false;
+  let pit1Filled = false;
+  let collidedWithF = false;
+  let objectFActive = false;
+  let objectFM = 0;
+  let objectFV = 0;
+  let objectFSinking = false;
+  let objectFSinkStart = 0;
+  let pit2Filled = false;
+  let s2WaitingNextAim = false;
   let collidedWithMud = false;
   let collidedWithWall = false;
   let s3Vx = 0;
@@ -967,55 +976,66 @@
     }
   };
 
-  // ---- Stage 2: 충돌의 구역 ----
-  const S2_ZONE_WIDTH_M = 2;
-  const S2_ZONE1_CENTER_M = 20;
-  const S2_ZONE1_LEFT_M = S2_ZONE1_CENTER_M - S2_ZONE_WIDTH_M/2;
-  const S2_ZONE1_RIGHT_M = S2_ZONE1_CENTER_M + S2_ZONE_WIDTH_M/2;
-  const S2_PIT_M = S2_ZONE1_CENTER_M + 8; // where object B sinks in and becomes new ground
-  const S2_MUD_M = S2_ZONE1_CENTER_M + 10; // stationary 2kg mud lump (object C)
-  const S2_ZONE2_CENTER_M = 50;
-  const S2_ZONE2_LEFT_M = S2_ZONE2_CENTER_M - S2_ZONE_WIDTH_M/2;
-  const S2_ZONE2_RIGHT_M = S2_ZONE2_CENTER_M + S2_ZONE_WIDTH_M/2;
-  const S2_WALL_LEFT_M = S2_ZONE2_RIGHT_M;
+  // ---- Stage 2: 충돌의 구역 (redesigned) ----
+  const S2_PIT_WIDTH_M = 0.7;
+  const S2_PIT_DEPTH_M = 0.7;
+  const S2_OBJECT_B_M = 2.3; // object B's start position = ball<->B elastic collision point
+  const S2_MISSILE_START_M = 3;
+  const S2_MISSILE_END_M = 21.3;
+  const S2_PIT1_LEFT_M = S2_MISSILE_END_M; // 21.3
+  const S2_PIT1_RIGHT_M = S2_PIT1_LEFT_M + S2_PIT_WIDTH_M; // 22.0
+  const S2_ZONE1_LEFT_M = S2_PIT1_RIGHT_M; // 22
+  const S2_ZONE1_RIGHT_M = S2_ZONE1_LEFT_M + 2; // 24
+  const S2_ZONE1_CENTER_M = (S2_ZONE1_LEFT_M + S2_ZONE1_RIGHT_M) / 2; // 23
+  const S2_OBJECT_F_LEFT_M = S2_ZONE1_CENTER_M - 0.35 + 0.7; // 23.35 — shifted 0.7m right
+  const S2_PIT2_LEFT_M = S2_ZONE1_RIGHT_M + 2 - 1 - 0.7; // 24.3 — shifted another 0.7m left
+  const S2_PIT2_RIGHT_M = S2_PIT2_LEFT_M + S2_PIT_WIDTH_M; // 25.0
+  const S2_MUD_M = S2_ZONE1_RIGHT_M + 3 - 1; // 26 — shifted 1m left
+  const S2_METEOR_START_M = S2_ZONE1_CENTER_M + 5 - 1; // 27
+  const S2_METEOR_END_M = S2_ZONE1_CENTER_M + 24 - 1; // 46
+  const S2_ZONE2_LEFT_M = S2_ZONE1_CENTER_M + 24 - 1; // 46
+  const S2_ZONE2_RIGHT_M = S2_ZONE1_CENTER_M + 26 - 1; // 48
+  const S2_WALL_LEFT_M = S2_ZONE2_RIGHT_M; // 48 — flush against the right edge of 안전지대2
   const S2_WALL_THICKNESS_M = 1;
   const S2_WALL_HEIGHT_M = 3;
   const OBJECT_B_SINK_MS = 550;
 
-  const SHIELD_LEN_M = 5;
+  const SHIELD_LEN_M = 4; // reduced 1m from the original 5m width
   const SHIELD_SPEED_MPS = 4;
   const SHIELD_HEIGHT_M = 2;
-  const SHIELD_TRACK_LEN_M = S2_ZONE1_CENTER_M; // shield cycles within [0, this]
+  const SHIELD1_TRACK_START_M = S2_MISSILE_START_M; // 3
+  const SHIELD1_TRACK_LEN_M = S2_ZONE1_CENTER_M - S2_MISSILE_START_M; // 20 (cycles within [3,23])
   const SHIELD2_SPEED_MPS = 5;
-  const SHIELD2_TRACK_START_M = S2_MUD_M;
-  const SHIELD2_TRACK_LEN_M = S2_ZONE2_CENTER_M - S2_MUD_M; // cycles within [mud, zone2 center]
+  const SHIELD2_TRACK_START_M = S2_METEOR_START_M; // 28
+  const SHIELD2_TRACK_LEN_M = 20; // cycles within [28,48]
   const SHIELDS = [
-    { speed: SHIELD_SPEED_MPS, trackStart: 0, trackLen: SHIELD_TRACK_LEN_M, rgb: '120,205,255', edgeRgb: '190,235,255', height: SHIELD_HEIGHT_M },
-    { speed: SHIELD2_SPEED_MPS, trackStart: SHIELD2_TRACK_START_M, trackLen: SHIELD2_TRACK_LEN_M, rgb: '100,210,120', edgeRgb: '190,245,190', height: SHIELD_HEIGHT_M }
+    { speed: SHIELD_SPEED_MPS, trackStart: SHIELD1_TRACK_START_M, trackLen: SHIELD1_TRACK_LEN_M, rgb: '30,120,195', edgeRgb: '110,180,225', height: SHIELD_HEIGHT_M },
+    { speed: SHIELD2_SPEED_MPS, trackStart: SHIELD2_TRACK_START_M, trackLen: SHIELD2_TRACK_LEN_M, rgb: '25,140,55', edgeRgb: '110,200,120', height: SHIELD_HEIGHT_M }
   ];
-  const PINK_SHIELD_START_M = S2_MUD_M;
-  const PINK_SHIELD_END_M = S2_ZONE2_LEFT_M;
-  const PINK_SHIELD_HEIGHT_M = SHIELD_HEIGHT_M + 1.5; // sits higher than the moving shields
-  const PINK_SHIELD_RGB = '224,120,190';
-  const PINK_SHIELD_EDGE_RGB = '250,200,230';
 
   const STAGE2_ZONES = {
     1: {
-      targetLeftM: S2_ZONE1_LEFT_M,
-      targetRightM: S2_ZONE1_RIGHT_M,
-      targetName: '안전지대 1',
-      hazard: {type:'missile', startM:1, endM:S2_ZONE1_LEFT_M, randomRangeFrac:1.0, missileDuration:0.9, minGapSec:0.08, maxGapSec:0.12}
+      targetLeftM: S2_OBJECT_B_M - 0.1,
+      targetRightM: S2_OBJECT_B_M + 0.1,
+      targetName: '물체B'
     },
     2: {
+      targetLeftM: S2_ZONE1_LEFT_M,
+      targetRightM: S2_ZONE1_RIGHT_M,
+      targetName: '안전지대1',
+      hazard: {type:'missile', startM:S2_MISSILE_START_M, endM:S2_MISSILE_END_M, randomRangeFrac:1.0, missileDuration:0.9, minGapSec:0.08, maxGapSec:0.12}
+    },
+    3: {
       targetLeftM: S2_ZONE2_LEFT_M,
       targetRightM: S2_ZONE2_RIGHT_M,
-      targetName: '안전지대 2',
-      hazard: {type:'meteor', startM:31, endM:49, randomRangeFrac:1.0, missileDuration:0.9, minGapSec:0.08, maxGapSec:0.12}
+      targetName: '안전지대2',
+      hazard: {type:'meteor', startM:S2_METEOR_START_M, endM:S2_METEOR_END_M, randomRangeFrac:1.0, missileDuration:0.9, minGapSec:0.08, maxGapSec:0.12}
     }
   };
   const STAGE2_VIEWS = {
     1: { startM: 0, spanM: S2_ZONE1_RIGHT_M + 3 },
-    2: { startM: S2_ZONE1_LEFT_M, spanM: S2_ZONE2_RIGHT_M - S2_ZONE1_LEFT_M + 3 }
+    2: { startM: 0, spanM: S2_ZONE1_RIGHT_M + 3 },
+    3: { startM: S2_ZONE1_LEFT_M, spanM: S2_ZONE2_RIGHT_M - S2_ZONE1_LEFT_M + 3 }
   };
 
   const STAGE1_FRICTION_N = 4; // fixed friction force for stage 1 (all zones)
@@ -1243,6 +1263,7 @@
   const playDistanceEl = document.getElementById('playDistance');
   const frictionLineEl = document.getElementById('frictionLine');
   const gravityLineEl = document.getElementById('gravityLine');
+  const s2CollisionLegendEl = document.getElementById('s2CollisionLegend');
   function formatTime(ms){
     const totalSec = Math.max(0, Math.floor(ms/1000));
     const mm = Math.floor(totalSec/60);
@@ -1424,22 +1445,11 @@
         all.push({startM: b.startM, endM: b.endM, rgb: cfg.rgb, edgeRgb: cfg.edgeRgb, height: cfg.height});
       });
     });
-    if(!bombZoneTriggered){
-      all.push({startM: PINK_SHIELD_START_M, endM: PINK_SHIELD_END_M, rgb: PINK_SHIELD_RGB, edgeRgb: PINK_SHIELD_EDGE_RGB, height: PINK_SHIELD_HEIGHT_M});
-    }
     return all;
   }
 
-  const PINK_SHIELD_FADE_MS = 1000;
   function getVisualShieldBands(now){
-    const all = getAllShieldBands(now);
-    if(bombZoneTriggered && pinkShieldFadeStart !== null){
-      const fadeAlpha = 1 - (now - pinkShieldFadeStart) / PINK_SHIELD_FADE_MS;
-      if(fadeAlpha > 0){
-        all.push({startM: PINK_SHIELD_START_M, endM: PINK_SHIELD_END_M, rgb: PINK_SHIELD_RGB, edgeRgb: PINK_SHIELD_EDGE_RGB, height: PINK_SHIELD_HEIGHT_M, fadeAlpha});
-      }
-    }
-    return all;
+    return getAllShieldBands(now);
   }
 
   function isCoveredByShield(m, now){
@@ -1463,6 +1473,9 @@
   }
   function currentViewStartM(){
     const span = currentSpanM();
+    if(gameStage === 2 && s2TrackObjectB && (mode === 'flying' || mode === 'resting')){
+      return objectBM - span/2;
+    }
     if(mode !== 'aiming' && mode !== 'locked'){
       return ballM - span/2;
     }
@@ -1590,6 +1603,7 @@
     } else if(gameStage === 2){
       flightV = captured.v0;
       flightDecel = 0;
+      s2TrackObjectB = false;
       resultEl.textContent = 'v0 '+captured.v0.toFixed(1)+' m/s — 등속으로 이동 중…';
     } else {
       flightV = captured.v0;
@@ -2030,6 +2044,8 @@
     gameOverReason = null;
     gaugeSpeedMultiplier = 1;
     collidedWithB = false;
+    ballSinking = false;
+    ballSinkStart = null;
     collidedWithMud = false;
     collidedWithWall = false;
     sedativeStatusEl.classList.remove('show');
@@ -2068,11 +2084,21 @@
     resultEl.textContent = '안전지대 2 통과! 이어서 안전지대 3으로 — 스페이스바로 v0 값을 고정해보세요.';
   }
 
-  function startS2Zone2(){
+  function startS2Stage2(){
     stage = 2;
     legStartM = ballM;
+    collidedWithF = false;
     startNewShot();
-    resultEl.textContent = '안전지대 1 통과! 이어서 안전지대 2로 — 스페이스바로 초기속도 값을 고정해보세요.';
+    resultEl.textContent = '물체B의 운명이 결정됐습니다! 이어서 물체F와 충돌해보세요 — 스페이스바로 초기속도 값을 고정해보세요.';
+  }
+
+  function startS2Stage3(){
+    stage = 3;
+    legStartM = ballM;
+    collidedWithMud = false;
+    collidedWithWall = false;
+    startNewShot();
+    resultEl.textContent = '물체F의 운명이 결정됐습니다! 이어서 안전지대2로 — 스페이스바로 초기속도 값을 고정해보세요.';
   }
 
   function startGameStage2(){
@@ -2086,12 +2112,21 @@
     ballM = 0;
     bombOrigin = performance.now();
     hazardSoundState = {};
-    objectBActive = false;
+    objectBActive = true;
+    objectBM = S2_OBJECT_B_M;
+    objectBV = 0;
     objectBSinking = false;
-    pitFilled = false;
-    bombZoneTriggered = false;
-    bombZoneTriggerTime = null;
-    pinkShieldFadeStart = null;
+    objectBExploded = false;
+    pit1Filled = false;
+    collidedWithB = false;
+    s2TrackObjectB = false;
+    objectFActive = true;
+    objectFM = S2_OBJECT_F_LEFT_M + BALL_SIZE_M/2;
+    objectFV = 0;
+    objectFSinking = false;
+    pit2Filled = false;
+    collidedWithF = false;
+    s2WaitingNextAim = false;
     updateGaugeLabelsForStage();
     rebuildTicks();
     startNewShot();
@@ -2099,6 +2134,7 @@
     showStageBanner('stage2: 충돌의 구역');
     frictionLineEl.style.display = 'none';
     gravityLineEl.style.display = 'none';
+    s2CollisionLegendEl.style.display = 'inline';
   }
 
   function startGameStage3(){
@@ -2123,6 +2159,7 @@
     showStageBanner('stage3: 언덕의 구역');
     frictionLineEl.style.display = 'none';
     gravityLineEl.style.display = 'inline';
+    s2CollisionLegendEl.style.display = 'none';
   }
 
   function fullReset(){
@@ -2141,10 +2178,12 @@
     gamePausedForItem = false;
     objectBActive = false;
     objectBSinking = false;
-    pitFilled = false;
-    bombZoneTriggered = false;
-    bombZoneTriggerTime = null;
-    pinkShieldFadeStart = null;
+    objectBExploded = false;
+    pit1Filled = false;
+    collidedWithF = false;
+    objectFActive = false;
+    objectFSinking = false;
+    pit2Filled = false;
     if(sedativeBtn) sedativeBtn.style.display = 'none';
     if(sedativeStatusEl) sedativeStatusEl.classList.remove('show');
     gameStage = 1;
@@ -2156,6 +2195,7 @@
     hazardSoundState = {};
     frictionLineEl.style.display = 'inline';
     gravityLineEl.style.display = 'none';
+    s2CollisionLegendEl.style.display = 'none';
     shotCountEl.textContent = shotCount;
     renderWorldList();
     hideGameOverOverlay();
@@ -2289,6 +2329,20 @@
 
   const MISSILE_FALL_FRAC = 0.6; // fraction of activeDur spent falling before impact
   const MISSILE_BLAST_RADIUS_M = 1.5;
+
+  // used to check whether a moving object (not just the main ball) is caught in an
+  // active missile/meteor impact — e.g. object B crossing the missile field
+  function checkMissileHitsPosition(posM, bombState){
+    return Object.keys(bombState).some((key)=>{
+      const b = bombState[key];
+      if(!b.active) return false;
+      if(b.type === 'missile' || b.type === 'meteor'){
+        if(posM < b.hz.startM || posM > b.hz.endM) return false;
+        return b.missiles.some((m)=> !m.absorbed && m.progress >= MISSILE_FALL_FRAC && Math.abs(posM - m.impactM) <= MISSILE_BLAST_RADIUS_M);
+      }
+      return false;
+    });
+  }
 
   function isBombHit(bomb){
     if(bomb.active){
@@ -3099,8 +3153,8 @@
     ctx.fillRect(x1, topY, x2-x1, 3);
   }
 
-  function drawPit(){
-    const cx = mToPx(S2_PIT_M);
+  function drawPit(cxM){
+    const cx = mToPx(cxM);
     const x1 = cx - ballR;
     const x2 = cx + ballR;
     const depth = ballR*2;
@@ -3115,22 +3169,10 @@
     ctx.beginPath(); ctx.moveTo(x2-0.5, mainLaneY); ctx.lineTo(x2-0.5, mainLaneY+depth); ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,0.15)';
     ctx.beginPath(); ctx.moveTo(x1, mainLaneY+0.5); ctx.lineTo(x2, mainLaneY+0.5); ctx.stroke();
-
-    // small red button on the pit floor, waiting to be pressed by object B
-    const btnR = Math.max(2.5, ballR*0.28);
-    const btnY = mainLaneY + depth - btnR*1.3;
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath(); ctx.ellipse(cx, btnY+btnR*0.5, btnR*1.3, btnR*0.5, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#8A2E2E';
-    ctx.beginPath(); ctx.arc(cx, btnY, btnR*1.15, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#D8453F';
-    ctx.beginPath(); ctx.arc(cx, btnY-btnR*0.15, btnR, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.beginPath(); ctx.arc(cx-btnR*0.3, btnY-btnR*0.4, btnR*0.3, 0, Math.PI*2); ctx.fill();
   }
 
-  function drawFilledPit(){
-    const cx = mToPx(S2_PIT_M);
+  function drawFilledPit(cxM){
+    const cx = mToPx(cxM);
     ctx.fillStyle = '#B94A4A';
     ctx.fillRect(cx-ballR, mainLaneY, ballR*2, ballR*2);
     ctx.strokeStyle = '#242220'; ctx.lineWidth = 1;
@@ -3187,7 +3229,7 @@
       ctx.fillStyle = '#242220';
       ctx.textAlign = 'center';
       ctx.fillText('2kg', x, mainLaneY-ballR*2-6+dy);
-      if(typeof speedMps === 'number'){
+      if(typeof speedMps === 'number' && speedMps > 0.005){
         ctx.textAlign = 'left';
         ctx.fillText(speedMps.toFixed(2)+' m/s', x+ballR+5, mainLaneY-ballR+dy);
       }
@@ -3384,6 +3426,29 @@
     ctx.fillText(label, midX-tw/2, y-10);
   }
 
+  function drawS2ShieldRangeLabel(leftM, rightM){
+    const x1 = mToPx(leftM), x2 = mToPx(rightM);
+    const fullHeight = mainLaneY - 40;
+    const zoneHeight = fullHeight / 3;
+    const zoneTop = mainLaneY - zoneHeight;
+    const y = zoneTop - scalePx();
+    ctx.strokeStyle = '#A79F8C'; ctx.lineWidth = 1;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(x1, y-6); ctx.lineTo(x1, y+6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2, y-6); ctx.lineTo(x2, y+6); ctx.stroke();
+
+    const label = (rightM-leftM).toFixed(0)+' m';
+    ctx.font = '700 20px "JetBrains Mono", monospace';
+    const tw = ctx.measureText(label).width;
+    const midX = (x1+x2)/2;
+    ctx.fillStyle = '#F7F4EC';
+    ctx.fillRect(midX-tw/2-6, y-27, tw+12, 22);
+    ctx.fillStyle = '#242220';
+    ctx.fillText(label, midX-tw/2, y-10);
+  }
+
   function drawGroundSparks(cx, groundY, speed){
     const now = performance.now();
     const intensity = Math.min(1, speed/8); // faster = a few more sparks, but stays subtle
@@ -3449,30 +3514,32 @@
   }
 
   function drawExplosion(px){
+    const gy = (gameStage === 3) ? groundYAtM(ballM) : mainLaneY;
     ctx.fillStyle = 'rgba(226,90,46,0.35)';
-    ctx.beginPath(); ctx.arc(px, (mainLaneY-ballR), 26, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(px, (gy-ballR), 26, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#E25A2E';
-    ctx.beginPath(); ctx.arc(px, (mainLaneY-ballR), 14, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(px, (gy-ballR), 14, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#FFF3E8';
-    ctx.beginPath(); ctx.arc(px, (mainLaneY-ballR), 6, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(px, (gy-ballR), 6, 0, Math.PI*2); ctx.fill();
   }
 
   function drawExplosionAnim(px, progress){
+    const gy = (gameStage === 3) ? groundYAtM(ballM) : mainLaneY;
     const maxR = 46;
     const r = 8 + maxR*progress;
     ctx.globalAlpha = Math.max(0, 1-progress);
     ctx.fillStyle = 'rgba(226,90,46,0.35)';
-    ctx.beginPath(); ctx.arc(px, (mainLaneY-ballR), r, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(px, (gy-ballR), r, 0, Math.PI*2); ctx.fill();
     ctx.globalAlpha = 1;
 
     ctx.globalAlpha = Math.max(0, 1-progress*1.3);
     ctx.fillStyle = '#E25A2E';
-    ctx.beginPath(); ctx.arc(px, (mainLaneY-ballR), r*0.55, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(px, (gy-ballR), r*0.55, 0, Math.PI*2); ctx.fill();
     ctx.globalAlpha = 1;
 
     ctx.globalAlpha = Math.max(0, 1-progress*2.2);
     ctx.fillStyle = '#FFF3E8';
-    ctx.beginPath(); ctx.arc(px, (mainLaneY-ballR), Math.max(0, 8*(1-progress)), 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(px, (gy-ballR), Math.max(0, 8*(1-progress)), 0, Math.PI*2); ctx.fill();
     ctx.globalAlpha = 1;
 
     const spikes = 8;
@@ -3482,8 +3549,8 @@
       const ang = (i/spikes)*Math.PI*2;
       const innerR = r*0.5, outerR = r*1.05;
       ctx.beginPath();
-      ctx.moveTo(px+Math.cos(ang)*innerR, (mainLaneY-ballR)+Math.sin(ang)*innerR);
-      ctx.lineTo(px+Math.cos(ang)*outerR, (mainLaneY-ballR)+Math.sin(ang)*outerR);
+      ctx.moveTo(px+Math.cos(ang)*innerR, (gy-ballR)+Math.sin(ang)*innerR);
+      ctx.lineTo(px+Math.cos(ang)*outerR, (gy-ballR)+Math.sin(ang)*outerR);
       ctx.stroke();
     }
   }
@@ -3535,7 +3602,10 @@
   function drawScene(bombState, nowTs){
     if(gameStage === 3){ drawGrid3(); } else { drawGrid(); }
     if(gameStage === 2){
-      if(pitFilled){ drawFilledPit(); } else { drawPit(); }
+      const pit1CenterM = (S2_PIT1_LEFT_M + S2_PIT1_RIGHT_M) / 2;
+      const pit2CenterM = (S2_PIT2_LEFT_M + S2_PIT2_RIGHT_M) / 2;
+      if(pit1Filled){ drawFilledPit(pit1CenterM); } else { drawPit(pit1CenterM); }
+      if(pit2Filled){ drawFilledPit(pit2CenterM); } else { drawPit(pit2CenterM); }
     }
     const cfg = currentStageCfg();
     Object.keys(ACTIVE_ZONES).forEach((key)=>{
@@ -3549,7 +3619,9 @@
           drawZone3(S3_X_HILL1_END, S3_X_HILL2_END, S3_HILL1_RISE, 3, z.targetName);
         }
       } else {
-        drawZone(z.targetLeftM, z.targetRightM, z.targetName);
+        if(!(gameStage === 2 && key === '1')){
+          drawZone(z.targetLeftM, z.targetRightM, z.targetName);
+        }
       }
     });
     if(gameStage === 2){
@@ -3565,16 +3637,19 @@
     if(gameStage === 2 && !collidedWithMud){
       drawMudLump(mToPx(S2_MUD_M), mainLaneY);
     }
-    if(gameStage === 2 && stage === 1 && !collidedWithB){
-      const z1 = ACTIVE_ZONES[1];
-      const collideM = (z1.targetLeftM + z1.targetRightM) / 2;
-      const gapM = (ballR*2) / scalePx();
-      drawObjectB(collideM + gapM);
-    } else if(objectBActive){
+    if(gameStage === 2 && objectBActive){
       const sinkT = objectBSinking ? (performance.now()-objectBSinkStart)/OBJECT_B_SINK_MS : 0;
       drawObjectB(objectBM, objectBV, sinkT);
     }
-    if(gameStage !== 3){ drawDistanceLabel(); }
+    if(gameStage === 2 && objectFActive){
+      const sinkTF = objectFSinking ? (performance.now()-objectFSinkStart)/OBJECT_B_SINK_MS : 0;
+      drawObjectB(objectFM, objectFV, sinkTF);
+    }
+    if(gameStage === 1){ drawDistanceLabel(); }
+    if(gameStage === 2){
+      drawS2ShieldRangeLabel(SHIELD1_TRACK_START_M, SHIELD1_TRACK_START_M + SHIELD1_TRACK_LEN_M);
+      drawS2ShieldRangeLabel(SHIELD2_TRACK_START_M, SHIELD2_TRACK_START_M + SHIELD2_TRACK_LEN_M);
+    }
     drawLegStart();
 
     if(gameStage !== 3){
@@ -3606,9 +3681,19 @@
         if(gameOverReason === 'bomb') drawExplosion(ballPx);
       }
     } else if(mode === 'flying' || mode === 'resting'){
-      drawLane(startPx, ballPx, mainLaneY, currentColor, 1, true);
-      if(gameStage === 1 && mode === 'flying' && flightV > 0.1){
-        drawGroundSparks(ballPx, mainLaneY, flightV);
+      if(gameStage === 2 && ballSinking){
+        const sinkT = Math.min(1, (performance.now()-ballSinkStart)/OBJECT_B_SINK_MS);
+        const eased = sinkT*sinkT*(3-2*sinkT);
+        const dy = eased*(ballR*2); // sinks exactly flush with the ground, filling the pit
+        ctx.fillStyle = currentColor;
+        ctx.fillRect(ballPx-ballR, mainLaneY-ballR*2+dy, ballR*2, ballR*2);
+        ctx.strokeStyle = '#242220'; ctx.lineWidth = 1;
+        ctx.strokeRect(ballPx-ballR, mainLaneY-ballR*2+dy, ballR*2, ballR*2);
+      } else {
+        drawLane(startPx, ballPx, mainLaneY, currentColor, 1, true);
+        if(gameStage === 1 && mode === 'flying' && flightV > 0.1){
+          drawGroundSparks(ballPx, mainLaneY, flightV);
+        }
       }
     } else if(mode === 'aiming' || mode === 'locked'){
       ctx.fillStyle = currentColor;
@@ -3714,6 +3799,7 @@
     });
 
     // distance labels between consecutive safe zones
+    if(gameStage !== 3){
     ctx.font = '700 ' + Math.max(7, mmH*0.15) + 'px "JetBrains Mono", monospace';
     ctx.fillStyle = '#1F8A6E';
     ctx.textBaseline = 'alphabetic';
@@ -3728,6 +3814,7 @@
       const label = Math.round(gapM) + 'm';
       const tw = ctx.measureText(label).width;
       ctx.fillText(label, midX - tw/2, midY - mmH*0.2);
+    }
     }
 
     // real-time bomb explosion markers (red)
@@ -3788,6 +3875,12 @@
         const bx = mapX(objectBM);
         ctx.fillStyle = '#B94A4A';
         ctx.beginPath(); ctx.arc(bx, mapY(objectBM), Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#242220'; ctx.lineWidth = 1; ctx.stroke();
+      }
+      if(objectFActive){
+        const fx = mapX(objectFM);
+        ctx.fillStyle = '#B94A4A';
+        ctx.beginPath(); ctx.arc(fx, mapY(objectFM), Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
         ctx.strokeStyle = '#242220'; ctx.lineWidth = 1; ctx.stroke();
       }
     }
@@ -3953,6 +4046,23 @@
     playGameOverSting();
   }
 
+  function triggerPitGameOver(){
+    mode = 'gameover';
+    gameOverReason = 'pit';
+    deathDistanceM = lastSafeDistanceM;
+    deathElapsedMs = gameStartTime !== null ? (performance.now() - gameStartTime) : 0;
+    stopBgLoop();
+    playGameOverSting();
+    mainBtn.disabled = false;
+    mainBtn.textContent = '재도전';
+    mainBtn.onclick = returnToStageSelect;
+    resultEl.className = 'result explode';
+    resultEl.textContent = '게임 오버 — 구덩이에 빠졌습니다.';
+    gameoverDistanceEl.textContent = deathDistanceM.toFixed(1) + ' m';
+    gameoverTimeEl.textContent = formatTime(deathElapsedMs);
+    showGameOverOverlay('구덩이에 빠졌습니다.');
+  }
+
   function triggerBoundaryGameOver(){
     mode = 'gameover';
     gameOverReason = 'boundary';
@@ -3998,10 +4108,12 @@
     gamePausedForItem = false;
     objectBActive = false;
     objectBSinking = false;
-    pitFilled = false;
-    bombZoneTriggered = false;
-    bombZoneTriggerTime = null;
-    pinkShieldFadeStart = null;
+    objectBExploded = false;
+    pit1Filled = false;
+    collidedWithF = false;
+    objectFActive = false;
+    objectFSinking = false;
+    pit2Filled = false;
     collidedWithMud = false;
     collidedWithWall = false;
     if(sedativeBtn) sedativeBtn.style.display = 'none';
@@ -4015,6 +4127,7 @@
     hazardSoundState = {};
     frictionLineEl.style.display = 'inline';
     gravityLineEl.style.display = 'none';
+    s2CollisionLegendEl.style.display = 'none';
     shotCountEl.textContent = shotCount;
     renderWorldList();
     hideGameOverOverlay();
@@ -4113,49 +4226,87 @@
         ballM += flightV*dt;
         flightV = Math.max(0, flightV - flightDecel*dt);
 
+        const ballR_m2 = ballR/scalePx();
+
         if(gameStage === 2 && stage === 1 && !collidedWithB){
-          const cfg = ACTIVE_ZONES[1];
-          const collideM = (cfg.targetLeftM + cfg.targetRightM) / 2;
-          if(ballM >= collideM){
-            ballM = collideM;
-            objectBActive = true;
-            objectBM = collideM + (ballR*2)/scalePx();
+          const collidePointM = S2_OBJECT_B_M - 2*ballR_m2;
+          if(ballM >= collidePointM){
+            ballM = collidePointM;
             objectBV = flightV;
             flightV = 0;
             collidedWithB = true;
+            s2TrackObjectB = true;
+            mode = 'resting';
+            resultEl.className = 'result success';
+            resultEl.textContent = '물체B와 충돌했습니다! 물체B의 운명이 정해질 때까지 잠시 기다려주세요…';
+            mainBtn.disabled = true;
+            mainBtn.textContent = '대기 중…';
+            mainBtn.onclick = null;
           }
         }
 
-        if(gameStage === 2 && mode === 'flying' && !collidedWithWall && ballM + ballR/scalePx() >= S2_WALL_LEFT_M){
-          ballM = S2_WALL_LEFT_M - ballR/scalePx();
-          flightV = 0;
-          collidedWithWall = true;
-          mode = 'resting';
-          resultEl.className = 'result success';
-          resultEl.textContent = '벽에 충돌했습니다! 잠시 후 스테이지가 클리어됩니다…';
-          mainBtn.disabled = true;
-          mainBtn.textContent = '\u00A0';
-          mainBtn.onclick = null;
-          playWallImpactSound();
-          setTimeout(()=>{
-            clearedStages.push(2);
-            showStageClearOverlay('stage2: 충돌의 구역 클리어', 'stage3으로 가기', startGameStage3);
-          }, 1000);
+        if(gameStage === 2 && stage === 2 && mode === 'flying'){
+          if(!pit1Filled && ballM + ballR_m2 >= S2_PIT1_LEFT_M && ballM - ballR_m2 <= S2_PIT1_RIGHT_M){
+            ballM = (S2_PIT1_LEFT_M + S2_PIT1_RIGHT_M) / 2;
+            flightV = 0;
+            ballSinking = true;
+            ballSinkStart = performance.now();
+            mode = 'resting';
+            resultEl.className = 'result';
+            resultEl.textContent = '구덩이에 빠지고 있습니다…';
+            mainBtn.disabled = true;
+            mainBtn.textContent = '\u00A0';
+            mainBtn.onclick = null;
+            setTimeout(()=>{ triggerPitGameOver(); }, OBJECT_B_SINK_MS + 2000);
+          } else if(!collidedWithF){
+            const collidePointM = S2_OBJECT_F_LEFT_M - ballR_m2;
+            if(ballM >= collidePointM){
+              ballM = collidePointM;
+              objectFV = flightV;
+              flightV = 0;
+              collidedWithF = true;
+              mode = 'resting';
+              resultEl.className = 'result success';
+              resultEl.textContent = '물체F와 충돌했습니다! 물체F가 구덩이에 빠질 때까지 잠시 기다려주세요…';
+              mainBtn.disabled = true;
+              mainBtn.textContent = '대기 중…';
+              mainBtn.onclick = null;
+            }
+          }
         }
 
-        if(gameStage === 2 && !collidedWithMud && ballM >= S2_MUD_M){
-          // perfectly inelastic collision: 2kg ball + 2kg mud -> 4kg combined
-          preMudCollisionV = flightV;
-          flightV = flightV * (2/(2+2));
-          collidedWithMud = true;
-          playMudSquelchSound();
+        if(gameStage === 2 && stage === 3){
+          if(mode === 'flying' && !collidedWithWall && ballM + ballR_m2 >= S2_WALL_LEFT_M){
+            ballM = S2_WALL_LEFT_M - ballR_m2;
+            flightV = 0;
+            collidedWithWall = true;
+            mode = 'resting';
+            resultEl.className = 'result success';
+            resultEl.textContent = '벽에 충돌했습니다! 잠시 후 스테이지가 클리어됩니다…';
+            mainBtn.disabled = true;
+            mainBtn.textContent = '\u00A0';
+            mainBtn.onclick = null;
+            playWallImpactSound();
+            setTimeout(()=>{
+              clearedStages.push(2);
+              showStageClearOverlay('stage2: 충돌의 구역 클리어', 'stage3으로 가기', startGameStage3);
+            }, 1000);
+          }
+
+          if(!collidedWithMud && ballM >= S2_MUD_M){
+            // perfectly inelastic collision: 2kg ball + 2kg mud -> 4kg combined
+            preMudCollisionV = flightV;
+            flightV = flightV * (2/(2+2));
+            collidedWithMud = true;
+            playMudSquelchSound();
+          }
         }
 
         if(gameStage === 1 && !sedativeCollected && ballM >= SEDATIVE_M){
           collectSedative();
         }
 
-        if(!collidedWithWall){
+        if(mode === 'flying' && !collidedWithWall){
           const outOfBoundsM = getLastZoneCfg().targetRightM + 5;
           const stopped = flightV <= 0.05;
           const outOfBounds = ballM > outOfBoundsM;
@@ -4170,36 +4321,57 @@
           finalizeGameOver();
         }
       }
-      if(objectBActive){
-        if(!objectBSinking){
-          objectBM += objectBV*dt;
-          if(objectBM >= S2_PIT_M){
-            objectBM = S2_PIT_M;
-            objectBSinking = true;
-            objectBSinkStart = performance.now();
-          } else if(mToPx(objectBM) - ballR > W){
-            objectBActive = false;
-          }
-        } else {
-          const sinkT = (performance.now() - objectBSinkStart) / OBJECT_B_SINK_MS;
-          if(sinkT >= 1){
-            objectBActive = false;
-            objectBSinking = false;
-            pitFilled = true;
-            bombZoneTriggered = true;
-            bombZoneTriggerTime = performance.now();
-            pinkShieldFadeStart = performance.now();
-            playShieldFadeSound();
-            if(mode === 'resting' && stage === 1 && gameStage === 2){
-              setTimeout(()=>{ if(mode === 'resting' && stage === 1) startS2Zone2(); }, 2000);
-            }
-          }
-        }
-      }
     }
 
     const bombNow = (gamePausedForItem && itemPauseStartTime !== null) ? itemPauseStartTime : now;
     const bomb = getBombState(bombNow);
+
+    if(gameStage === 2 && objectBActive && !objectBSinking){
+      objectBM += objectBV*dt;
+      if(!isCoveredByShield(objectBM, bombNow) && checkMissileHitsPosition(objectBM, bomb)){
+        objectBActive = false;
+        objectBExploded = true;
+        if(mode === 'resting' && stage === 1){
+          setTimeout(()=>{ if(mode === 'resting' && stage === 1) startS2Stage2(); }, 2000);
+        }
+      } else if(objectBM >= S2_PIT1_LEFT_M){
+        objectBM = (S2_PIT1_LEFT_M + S2_PIT1_RIGHT_M) / 2;
+        objectBSinking = true;
+        objectBSinkStart = performance.now();
+      }
+    } else if(gameStage === 2 && objectBSinking){
+      const sinkT = (performance.now() - objectBSinkStart) / OBJECT_B_SINK_MS;
+      if(sinkT >= 1){
+        objectBActive = false;
+        objectBSinking = false;
+        pit1Filled = true;
+        playShieldFadeSound();
+        if(mode === 'resting' && stage === 1){
+          setTimeout(()=>{ if(mode === 'resting' && stage === 1) startS2Stage2(); }, 2000);
+        }
+      }
+    }
+
+    if(gameStage === 2 && objectFActive && !objectFSinking){
+      objectFM += objectFV*dt;
+      if(objectFM >= S2_PIT2_LEFT_M){
+        objectFM = (S2_PIT2_LEFT_M + S2_PIT2_RIGHT_M) / 2;
+        objectFSinking = true;
+        objectFSinkStart = performance.now();
+      }
+    } else if(gameStage === 2 && objectFSinking){
+      const sinkTF = (performance.now() - objectFSinkStart) / OBJECT_B_SINK_MS;
+      if(sinkTF >= 1){
+        objectFActive = false;
+        objectFSinking = false;
+        pit2Filled = true;
+        playShieldFadeSound();
+        if(mode === 'resting' && stage === 2){
+          setTimeout(()=>{ if(mode === 'resting' && stage === 2) startS2Stage3(); }, 2000);
+        }
+      }
+    }
+
     const ballShielded = gameStage === 2 && isCoveredByShield(ballM, bombNow);
     if(!gamePausedForItem && !ballShielded && (mode === 'flying' || mode === 'resting') && isHazardHit(bomb)){
       triggerGameOver();
@@ -4317,6 +4489,7 @@
       hazardSoundState = {};
       frictionLineEl.style.display = 'inline';
       gravityLineEl.style.display = 'none';
+      s2CollisionLegendEl.style.display = 'none';
       updateGaugeLabelsForStage();
       rebuildTicks();
       bombOrigin = performance.now();
