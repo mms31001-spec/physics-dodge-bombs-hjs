@@ -10,7 +10,6 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<meta name="apple-mobile-web-app-title" content="물리학폭탄피하기">
 <title>물리학으로 폭탄 피하기</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Serif+KR:wght@500;600&display=swap" rel="stylesheet">
@@ -417,6 +416,7 @@
     -webkit-tap-highlight-color:transparent;
   }
   .sedative-btn:active{ transform:scale(0.94); }
+  .sedative-btn2{ right:74px; }
 
   .stage-banner{
     position:absolute; inset:0;
@@ -718,7 +718,7 @@
         <div class="gameover-title">게임 오버</div>
         <p class="gameover-sub" id="gameoverReasonText"></p>
         <div class="gameover-stats" id="gameoverStats">
-          <div>이동 거리: <b class="mono" id="gameoverDistance">0 m</b></div>
+          <div>도달 거리: <b class="mono" id="gameoverDistance">0 m</b></div>
           <div>소요 시간: <b class="mono" id="gameoverTime">00:00</b></div>
         </div>
         <button id="overlayRestartBtn">재도전</button>
@@ -734,7 +734,7 @@
         <div class="stage-clear-title" id="stageClearTitle">stage1: 마찰의 구역 클리어</div>
         <div class="stage-clear-progress" id="stageClearProgress">클리어한 스테이지: 1</div>
         <div class="gameover-stats" id="stageClearStats">
-          <div>이동 거리: <b class="mono" id="stageClearDistance">0 m</b></div>
+          <div>도달 거리: <b class="mono" id="stageClearDistance">0 m</b></div>
           <div>소요 시간: <b class="mono" id="stageClearTime">00:00</b></div>
         </div>
         <button id="stageClearBtn">stage2로 가기</button>
@@ -748,6 +748,9 @@
       </div>
 
       <button type="button" class="sedative-btn" id="sedativeBtn" style="display:none;" aria-label="신경안정제 사용">
+        <div class="pill-icon small"><span class="pill-half left"></span><span class="pill-half right"></span></div>
+      </button>
+      <button type="button" class="sedative-btn sedative-btn2" id="sedativeBtn2" style="display:none;" aria-label="신경안정제 사용">
         <div class="pill-icon small"><span class="pill-half left"></span><span class="pill-half right"></span></div>
       </button>
 
@@ -841,7 +844,16 @@
   // frozen at the moment it's hit), instead of the ball drifting up/down as the
   // terrain height changes under a fixed ground line
   function updateMainLaneY(){
-    if(gameStage === 3 && (mode === 'flying' || mode === 'resting' || mode === 'exploding' || mode === 'gameover')){
+    if(gameStage === 3 && stage === 3 && (mode === 'aiming' || mode === 'locked')){
+      // 안전지대2 aiming screen: sit the ball about 5m lower on screen than its true height
+      const ballHeightM = s3TerrainHeightM(ballM);
+      mainLaneY = H/2 + (ballHeightM + 5)*scalePx();
+    } else if(gameStage === 3 && stage === 2 && (mode === 'aiming' || mode === 'locked')){
+      // 안전지대1 aiming screen: push the ball down toward the bottom-left so the
+      // zoomed-in view still has room to fit 안전지대2 without clipping it
+      const ballHeightM = s3TerrainHeightM(ballM);
+      mainLaneY = H/2 + (ballHeightM + 8)*scalePx();
+    } else if(gameStage === 3 && (mode === 'flying' || mode === 'resting' || mode === 'exploding' || mode === 'gameover')){
       const ballHeightM = s3TerrainHeightM(ballM);
       mainLaneY = H/2 + ballHeightM*scalePx();
     } else {
@@ -925,8 +937,9 @@
   let distanceOffsetM = 0;
   let lastSafeDistanceM = 0;
   let clearedStages = [];
-  let sedativeCollected = false;
-  let sedativeUsed = false;
+  let sedativeS1Taken = false;
+  let sedativeS3Taken = false;
+  let sedativeCount = 0; // unused sedatives currently held (0-2)
   let gaugeSpeedMultiplier = 1;
   let gamePausedForItem = false;
   let collidedWithB = false;
@@ -940,18 +953,22 @@
   let objectBExploded = false;
   let s2TrackObjectB = false;
   let pit1Filled = false;
-  let collidedWithF = false;
-  let objectFActive = false;
-  let objectFM = 0;
-  let objectFV = 0;
-  let objectFSinking = false;
-  let objectFSinkStart = 0;
-  let pit2Filled = false;
+  let collidedWithZone1Wall = false;
+  let s2Zone1WallSinking = false;
+  let s2Zone1WallSinkStart = 0;
+  let s2Zone1WallGone = false;
+  let collidedWithZone2Wall = false;
+  let s2Zone2WallSinking = false;
+  let s2Zone2WallSinkStart = 0;
+  let s2Zone2WallGone = false;
+  let collidedWithZone3Wall = false;
   let s2WaitingNextAim = false;
   let collidedWithMud = false;
+  let collidedWithMud2 = false;
   let collidedWithWall = false;
   let s3Vx = 0;
   let preMudCollisionV = 0;
+  let preMudCollisionV2 = 0;
   let deathElapsedMs = 0;
 
   const STAGE1_ZONES = {
@@ -959,19 +976,22 @@
       targetLeftM: ZONE1_LEFT_M,
       targetRightM: ZONE1_RIGHT_M,
       targetName: '안전지대 1',
-      hazard: {type:'sweep', startM:1, endM:ZONE1_LEFT_M, sweepSec:1.5, pauseSec:2.5}
+      hazard: {type:'segments', baseM:1, segLenM:(ZONE1_LEFT_M-1)/5, count:5, segDurationSec:0.3, pauseSec:2, effect:'airstrike'}
     },
     2: {
       targetLeftM: ZONE2_LEFT_M,
       targetRightM: ZONE2_RIGHT_M,
       targetName: '안전지대 2',
-      hazard: {type:'segments', baseM:10.5, segLenM:22/4, count:4, segDurationSec:0.5, pauseSec:4.5}
+      hazard: {type:'segments', baseM:10.5, segLenM:22/4, count:4, segDurationSec:0.5, pauseSec:3}
     },
     3: {
       targetLeftM: ZONE3_LEFT_M,
       targetRightM: ZONE3_RIGHT_M,
       targetName: '안전지대 3',
-      hazard: {type:'nukes', baseM:35.5, segLenM:46/10, count:10, segDurationSec:0.5, simultaneous:true, period:8.5},
+      hazards: [
+        {type:'nukes', baseM:35.5, segLenM:46/10, count:10, segDurationSec:0.5, simultaneous:true, period:8.5},
+        {type:'airburst', startM:ZONE3_RIGHT_M, endM:ZONE3_RIGHT_M+10, randomRangeFrac:1.0, explosionDuration:0.45, minGapSec:0.06, maxGapSec:0.1067}
+      ],
       isLast: true
     }
   };
@@ -987,15 +1007,21 @@
   const S2_ZONE1_LEFT_M = S2_PIT1_RIGHT_M; // 22
   const S2_ZONE1_RIGHT_M = S2_ZONE1_LEFT_M + 2; // 24
   const S2_ZONE1_CENTER_M = (S2_ZONE1_LEFT_M + S2_ZONE1_RIGHT_M) / 2; // 23
-  const S2_OBJECT_F_LEFT_M = S2_ZONE1_CENTER_M - 0.35 + 0.7; // 23.35 — shifted 0.7m right
-  const S2_PIT2_LEFT_M = S2_ZONE1_RIGHT_M + 2 - 1 - 0.7; // 24.3 — shifted another 0.7m left
-  const S2_PIT2_RIGHT_M = S2_PIT2_LEFT_M + S2_PIT_WIDTH_M; // 25.0
+  const S2_ZONE1_WALL_LEFT_M = S2_ZONE1_RIGHT_M; // 24 — flush against the right edge of 안전지대1
+  const S2_MUD_MASS_KG = 2;
+  const S2_MUD2_MASS_KG = 4;
   const S2_MUD_M = S2_ZONE1_RIGHT_M + 3 - 1; // 26 — shifted 1m left
   const S2_METEOR_START_M = S2_ZONE1_CENTER_M + 5 - 1; // 27
   const S2_METEOR_END_M = S2_ZONE1_CENTER_M + 24 - 1; // 46
   const S2_ZONE2_LEFT_M = S2_ZONE1_CENTER_M + 24 - 1; // 46
   const S2_ZONE2_RIGHT_M = S2_ZONE1_CENTER_M + 26 - 1; // 48
-  const S2_WALL_LEFT_M = S2_ZONE2_RIGHT_M; // 48 — flush against the right edge of 안전지대2
+  const S2_ZONE2_WALL_LEFT_M = S2_ZONE2_RIGHT_M; // 48 — flush against the right edge of 안전지대2 (sinks, like 안전지대1's)
+  const S2_MUD2_M = S2_ZONE2_RIGHT_M + 2; // 50 — mirrors S2_MUD_M's offset from 안전지대1
+  const S2_METEOR2_START_M = S2_ZONE2_RIGHT_M + 3; // 51 — mirrors S2_METEOR_START_M's offset
+  const S2_METEOR2_END_M = S2_ZONE2_RIGHT_M + 22; // 70 — mirrors S2_METEOR_END_M's offset
+  const S2_ZONE3_LEFT_M = S2_METEOR2_END_M; // 70
+  const S2_ZONE3_RIGHT_M = S2_ZONE2_RIGHT_M + 24; // 72
+  const S2_ZONE3_WALL_LEFT_M = S2_ZONE3_RIGHT_M; // 72 — final wall, never sinks
   const S2_WALL_THICKNESS_M = 1;
   const S2_WALL_HEIGHT_M = 3;
   const OBJECT_B_SINK_MS = 550;
@@ -1008,9 +1034,13 @@
   const SHIELD2_SPEED_MPS = 5;
   const SHIELD2_TRACK_START_M = S2_METEOR_START_M; // 28
   const SHIELD2_TRACK_LEN_M = 20; // cycles within [28,48]
+  const SHIELD3_SPEED_MPS = SHIELD2_SPEED_MPS; // identical to 보호막2
+  const SHIELD3_TRACK_START_M = S2_METEOR2_START_M; // mirrors SHIELD2's offset from its meteor field
+  const SHIELD3_TRACK_LEN_M = 20;
   const SHIELDS = [
     { speed: SHIELD_SPEED_MPS, trackStart: SHIELD1_TRACK_START_M, trackLen: SHIELD1_TRACK_LEN_M, rgb: '30,120,195', edgeRgb: '110,180,225', height: SHIELD_HEIGHT_M },
-    { speed: SHIELD2_SPEED_MPS, trackStart: SHIELD2_TRACK_START_M, trackLen: SHIELD2_TRACK_LEN_M, rgb: '25,140,55', edgeRgb: '110,200,120', height: SHIELD_HEIGHT_M }
+    { speed: SHIELD2_SPEED_MPS, trackStart: SHIELD2_TRACK_START_M, trackLen: SHIELD2_TRACK_LEN_M, rgb: '25,140,55', edgeRgb: '110,200,120', height: SHIELD_HEIGHT_M },
+    { speed: SHIELD3_SPEED_MPS, trackStart: SHIELD3_TRACK_START_M, trackLen: SHIELD3_TRACK_LEN_M, rgb: '25,140,55', edgeRgb: '110,200,120', height: SHIELD_HEIGHT_M }
   ];
 
   const STAGE2_ZONES = {
@@ -1030,12 +1060,20 @@
       targetRightM: S2_ZONE2_RIGHT_M,
       targetName: '안전지대2',
       hazard: {type:'meteor', startM:S2_METEOR_START_M, endM:S2_METEOR_END_M, randomRangeFrac:1.0, missileDuration:0.9, minGapSec:0.08, maxGapSec:0.12}
+    },
+    4: {
+      targetLeftM: S2_ZONE3_LEFT_M,
+      targetRightM: S2_ZONE3_RIGHT_M,
+      targetName: '안전지대3',
+      isLast: true,
+      hazard: {type:'meteor', startM:S2_METEOR2_START_M, endM:S2_METEOR2_END_M, randomRangeFrac:1.0, missileDuration:0.9, minGapSec:0.08, maxGapSec:0.12}
     }
   };
   const STAGE2_VIEWS = {
     1: { startM: 0, spanM: S2_ZONE1_RIGHT_M + 3 },
     2: { startM: 0, spanM: S2_ZONE1_RIGHT_M + 3 },
-    3: { startM: S2_ZONE1_LEFT_M, spanM: S2_ZONE2_RIGHT_M - S2_ZONE1_LEFT_M + 3 }
+    3: { startM: S2_ZONE1_LEFT_M, spanM: S2_ZONE2_RIGHT_M - S2_ZONE1_LEFT_M + 3 },
+    4: { startM: S2_ZONE2_LEFT_M, spanM: S2_ZONE3_RIGHT_M - S2_ZONE2_LEFT_M + 3 }
   };
 
   const STAGE1_FRICTION_N = 4; // fixed friction force for stage 1 (all zones)
@@ -1048,6 +1086,7 @@
 
   const S3_X_HILL1_START = S3_FLAT0_LEN; // 5
   const S3_X_HILL1_END = S3_X_HILL1_START + S3_HILL1_RUN; // 15
+  const S3_SEDATIVE_M = (S3_X_HILL1_START + S3_X_HILL1_END) / 2; // item location, midpoint of 오르막1
 
   // the button: a small red right-triangle bump sitting on the flat stretch after hill1.
   // Left face is a 45-degree ramp; right face is a vertical wall. While something is
@@ -1092,13 +1131,29 @@
   const S3_X_HILLB_TOP = S3_X_VALLEY_FLAT_END + S3_HILLB_RUN_UP; // 57
   const S3_HEIGHT_HILLB_TOP = S3_HEIGHT_HILL2_TOP + 19.5; // 25
 
-  const S3_HILLB_RUN_DOWN = 5;
-  const S3_X_HILLB_DOWN_END = S3_X_HILLB_TOP + S3_HILLB_RUN_DOWN; // 61
-  const S3_HILLB_DROP = 5;
-  const S3_HEIGHT_AFTER_HILLB = S3_HEIGHT_HILLB_TOP - S3_HILLB_DROP; // 21
-
+  // past hill B's peak, the ground runs flat at the peak's own height — no more
+  // downhill; a long, calm runway leading to 안전지대3.
   const S3_MAX_HEIGHT = S3_HEIGHT_HILLB_TOP; // for camera/minimap vertical scaling
-  const S3_WORLD_END_M = S3_X_HILLB_DOWN_END + 12; // temporary boundary past hill B, until hazards are built
+
+  // 안전지대3: centered 30m past hill B's peak, on the flat runway, 2m wide
+  const S3_ZONE3_WIDTH_M = 2;
+  const S3_ZONE3_CENTER_M = S3_X_HILLB_TOP + 30; // 87
+  const S3_ZONE3_LEFT_M = S3_ZONE3_CENTER_M - S3_ZONE3_WIDTH_M/2; // 86
+  const S3_ZONE3_RIGHT_M = S3_ZONE3_CENTER_M + S3_ZONE3_WIDTH_M/2; // 88
+
+  const S3_WORLD_END_M = S3_ZONE3_RIGHT_M + 10; // 98
+
+  // wall at 안전지대3's right edge — same restitution-0 wall as stage2's, colliding
+  // with it clears stage3
+  const S3_WALL_LEFT_M = S3_ZONE3_RIGHT_M;
+  const S3_WALL_THICKNESS_M = 1;
+  const S3_WALL_HEIGHT_M = 3;
+
+  // shield cycling rightward between 안전지대2's right edge and 안전지대3's center,
+  // same shape/look as stage2's 보호막1, but at 6 m/s
+  const STAGE3_ZONE3_SHIELDS = [
+    { speed: 6, trackStart: S3_X_HILLB_TOP, trackLen: S3_ZONE3_CENTER_M - S3_X_HILLB_TOP, rgb: '30,120,195', edgeRgb: '110,180,225', height: SHIELD_HEIGHT_M }
+  ];
 
   // smooth S-curve: 0 at t=0, 1 at t=1, zero slope at both ends — used so every hill/valley
   // transitions into its neighboring flat or slope with no sharp corner
@@ -1143,11 +1198,7 @@
       const t = (xM - S3_X_VALLEY_FLAT_END) / S3_HILLB_RUN_UP;
       return S3_HEIGHT_VALLEY + s3SmoothRamp(t)*(S3_HEIGHT_HILLB_TOP - S3_HEIGHT_VALLEY);
     }
-    if(xM < S3_X_HILLB_DOWN_END){
-      const t = (xM - S3_X_HILLB_TOP) / S3_HILLB_RUN_DOWN;
-      return S3_HEIGHT_HILLB_TOP - s3SmoothRamp(t)*S3_HILLB_DROP;
-    }
-    return S3_HEIGHT_AFTER_HILLB;
+    return S3_HEIGHT_HILLB_TOP;
   }
 
   // local terrain slope dh/dx at xM — piecewise-constant on the straight ramps
@@ -1169,10 +1220,6 @@
       const t = (xM - S3_X_VALLEY_FLAT_END) / S3_HILLB_RUN_UP;
       const rise = S3_HEIGHT_HILLB_TOP - S3_HEIGHT_VALLEY;
       return rise * (Math.PI/2) * Math.sin(Math.PI*t) / S3_HILLB_RUN_UP;
-    }
-    if(xM > S3_X_HILLB_TOP && xM < S3_X_HILLB_DOWN_END){
-      const t = (xM - S3_X_HILLB_TOP) / S3_HILLB_RUN_DOWN;
-      return -S3_HILLB_DROP * (Math.PI/2) * Math.sin(Math.PI*t) / S3_HILLB_RUN_DOWN;
     }
     return 0;
   }
@@ -1214,23 +1261,26 @@
     2: {
       targetLeftM: S3_X_HILLA_TOP, targetRightM: S3_X_HILLB_TOP, targetName: '안전지대2',
       hazards: [
-        {type:'segments', baseM:S3_X_HILL2_END, segLenM:(S3_X_HILLA_TOP-S3_X_HILL2_END)/20, count:20, segDurationSec:0.2, pauseSec:2},
-        {type:'nukes', baseM:S3_X_HILLB_TOP, segLenM:((S3_X_HILLB_DOWN_END+10)-S3_X_HILLB_TOP)/10, count:10, segDurationSec:0.5, simultaneous:true, period:1.5}
+        {type:'segments', baseM:S3_X_HILL2_END, segLenM:(S3_X_HILLA_TOP-S3_X_HILL2_END)/20, count:20, segDurationSec:0.2, pauseSec:2}
       ]
+    },
+    3: {
+      targetLeftM: S3_ZONE3_LEFT_M, targetRightM: S3_ZONE3_RIGHT_M, targetName: '안전지대3',
+      isLast: true,
+      hazard: {type:'meteor', startM:S3_X_HILLB_TOP, endM:S3_ZONE3_LEFT_M, randomRangeFrac:1.0, missileDuration:0.9, minGapSec:0.08, maxGapSec:0.12}
     }
   };
   const STAGE3_VIEWS = {
     1: { startM: 0, spanM: (S3_X_HILL2_END + 4 + 3) / 1.2 },
-    2: { startM: S3_X_HILL1_END, spanM: Math.max(
-      (S3_WORLD_END_M - S3_X_HILL1_END + 3) / 1.2,
-      ((S3_MAX_HEIGHT + 5) / mainLaneY) * USABLE
-    ) }
+    2: { startM: S3_BUTTON_RIGHT - 1.5, spanM: 55 }, // zoomed in: ball near the bottom-left edge (nudged up a bit to clear the sedative-status banner), 안전지대2 fully visible and clear of the badge, meteor corridor only just peeks in
+    3: { startM: S3_BUTTON2_RIGHT - 4.2, spanM: 56.4 / 1.1 } // zoomed in: ball near the left edge, 안전지대3 near the right, clear of the top-right badge
   };
 
   let gameStage = 1;
   let ACTIVE_ZONES = STAGE1_ZONES;
   let ACTIVE_VIEWS = STAGE1_VIEWS;
   let QUANTITIES = QUANTITIES_STAGE1;
+  let ACTIVE_SHIELDS = [];
 
   let runs = [];
   let worldSeq = 0;
@@ -1322,6 +1372,7 @@
   const itemPickupOverlay = document.getElementById('itemPickupOverlay');
   const itemPickupConfirmBtn = document.getElementById('itemPickupConfirmBtn');
   const sedativeBtn = document.getElementById('sedativeBtn');
+  const sedativeBtn2 = document.getElementById('sedativeBtn2');
   const sedativeStatusEl = document.getElementById('sedativeStatus');
   const sedativeConfirmOverlay = document.getElementById('sedativeConfirmOverlay');
   const sedativeUseBtn = document.getElementById('sedativeUseBtn');
@@ -1341,8 +1392,8 @@
     gamePausedForItem = false;
   }
 
-  function collectSedative(){
-    sedativeCollected = true;
+  function collectSedative(source){
+    if(source === 's3') sedativeS3Taken = true; else sedativeS1Taken = true;
     pauseForItem();
     itemPickupOverlay.classList.add('show');
   }
@@ -1351,22 +1402,25 @@
     e.stopPropagation();
     itemPickupOverlay.classList.remove('show');
     resumeFromItemPause();
-    if(!sedativeUsed) sedativeBtn.style.display = 'flex';
+    sedativeCount = Math.min(2, sedativeCount + 1);
   });
 
-  sedativeBtn.addEventListener('click', (e)=>{
+  function openSedativeConfirm(e){
     e.preventDefault();
     e.stopPropagation();
     if(mode !== 'aiming') return;
     pauseForItem();
     sedativeConfirmOverlay.classList.add('show');
-  });
+  }
+  sedativeBtn.addEventListener('click', openSedativeConfirm);
+  sedativeBtn2.addEventListener('click', openSedativeConfirm);
   sedativeUseBtn.addEventListener('click', (e)=>{
     e.preventDefault();
     e.stopPropagation();
-    gaugeSpeedMultiplier = 0.5;
-    sedativeUsed = true;
-    sedativeBtn.style.display = 'none';
+    gaugeSpeedMultiplier *= 0.5;
+    sedativeCount = Math.max(0, sedativeCount - 1);
+    sedativeBtn.style.display = sedativeCount > 0 ? 'flex' : 'none';
+    sedativeBtn2.style.display = sedativeCount > 1 ? 'flex' : 'none';
     sedativeConfirmOverlay.classList.remove('show');
     resumeFromItemPause();
     sedativeStatusEl.classList.add('show');
@@ -1419,7 +1473,7 @@
     const cfg = currentStageCfg();
     const hz = cfg.hazards ? cfg.hazards[0] : cfg.hazard;
     if(!hz) return 0;
-    return (hz.type === 'sweep' || hz.type === 'area' || hz.type === 'missile' || hz.type === 'meteor') ? hz.startM : hz.baseM;
+    return (hz.type === 'sweep' || hz.type === 'area' || hz.type === 'missile' || hz.type === 'meteor' || hz.type === 'airburst') ? hz.startM : hz.baseM;
   }
 
   // ---- Stage2: invincible shields that cycle along their own track ----
@@ -1440,9 +1494,9 @@
 
   function getAllShieldBands(now){
     const all = [];
-    SHIELDS.forEach((cfg)=>{
+    ACTIVE_SHIELDS.forEach((cfg)=>{
       getShieldBandsForConfig(now, cfg).forEach((b)=>{
-        all.push({startM: b.startM, endM: b.endM, rgb: cfg.rgb, edgeRgb: cfg.edgeRgb, height: cfg.height});
+        all.push({startM: b.startM, endM: b.endM, rgb: cfg.rgb, edgeRgb: cfg.edgeRgb, height: cfg.height, speed: cfg.speed});
       });
     });
     return all;
@@ -1483,6 +1537,10 @@
   }
   function mToPx(m){
     return MARGIN + (m - currentViewStartM()) * (USABLE / currentSpanM());
+  }
+  function isMInView(m){
+    const start = currentViewStartM();
+    return m >= start && m <= start + currentSpanM();
   }
   function scalePx(){
     return USABLE / currentSpanM();
@@ -2047,8 +2105,8 @@
     ballSinking = false;
     ballSinkStart = null;
     collidedWithMud = false;
+    collidedWithMud2 = false;
     collidedWithWall = false;
-    sedativeStatusEl.classList.remove('show');
     hideFoulOverlay();
     mainBtn.disabled = false;
     mainBtn.textContent = '고정 (Space)';
@@ -2070,6 +2128,15 @@
     resultEl.textContent = '안전지대1 통과! 이어서 안전지대2로 — 스페이스바로 v0 값을 고정해보세요.';
   }
 
+  function startS3Zone3(){
+    stage = 3;
+    legStartM = ballM;
+    s3Vx = 0;
+    collidedWithWall = false;
+    startNewShot();
+    resultEl.textContent = '안전지대2 통과! 이어서 안전지대3으로 — 스페이스바로 v0 값을 고정해보세요.';
+  }
+
   function startZone2(){
     stage = 2;
     legStartM = ballM;
@@ -2087,18 +2154,27 @@
   function startS2Stage2(){
     stage = 2;
     legStartM = ballM;
-    collidedWithF = false;
+    collidedWithZone1Wall = false;
     startNewShot();
-    resultEl.textContent = '물체B의 운명이 결정됐습니다! 이어서 물체F와 충돌해보세요 — 스페이스바로 초기속도 값을 고정해보세요.';
+    resultEl.textContent = '물체B의 운명이 결정됐습니다! 이어서 안전지대1의 벽에 충돌해보세요 — 스페이스바로 초기속도 값을 고정해보세요.';
   }
 
   function startS2Stage3(){
     stage = 3;
     legStartM = ballM;
     collidedWithMud = false;
-    collidedWithWall = false;
+    collidedWithZone2Wall = false;
     startNewShot();
-    resultEl.textContent = '물체F의 운명이 결정됐습니다! 이어서 안전지대2로 — 스페이스바로 초기속도 값을 고정해보세요.';
+    resultEl.textContent = '안전지대1 벽이 가라앉았습니다! 이어서 안전지대2로 — 스페이스바로 초기속도 값을 고정해보세요.';
+  }
+
+  function startS2Stage4(){
+    stage = 4;
+    legStartM = ballM;
+    collidedWithMud2 = false;
+    collidedWithZone3Wall = false;
+    startNewShot();
+    resultEl.textContent = '안전지대2 벽이 가라앉았습니다! 이어서 안전지대3으로 — 스페이스바로 초기속도 값을 고정해보세요.';
   }
 
   function startGameStage2(){
@@ -2107,6 +2183,7 @@
     ACTIVE_ZONES = STAGE2_ZONES;
     ACTIVE_VIEWS = STAGE2_VIEWS;
     QUANTITIES = QUANTITIES_STAGE2;
+    ACTIVE_SHIELDS = SHIELDS;
     stage = 1;
     legStartM = 0;
     ballM = 0;
@@ -2120,12 +2197,14 @@
     pit1Filled = false;
     collidedWithB = false;
     s2TrackObjectB = false;
-    objectFActive = true;
-    objectFM = S2_OBJECT_F_LEFT_M + BALL_SIZE_M/2;
-    objectFV = 0;
-    objectFSinking = false;
-    pit2Filled = false;
-    collidedWithF = false;
+    collidedWithZone1Wall = false;
+    s2Zone1WallSinking = false;
+    s2Zone1WallGone = false;
+    collidedWithZone2Wall = false;
+    s2Zone2WallSinking = false;
+    s2Zone2WallGone = false;
+    collidedWithMud2 = false;
+    collidedWithZone3Wall = false;
     s2WaitingNextAim = false;
     updateGaugeLabelsForStage();
     rebuildTicks();
@@ -2143,6 +2222,7 @@
     ACTIVE_ZONES = STAGE3_ZONES;
     ACTIVE_VIEWS = STAGE3_VIEWS;
     QUANTITIES = QUANTITIES_STAGE3;
+    ACTIVE_SHIELDS = STAGE3_ZONE3_SHIELDS;
     stage = 1;
     legStartM = 0;
     ballM = 0;
@@ -2172,22 +2252,29 @@
     distanceOffsetM = 0;
     lastSafeDistanceM = 0;
     clearedStages = [];
-    sedativeCollected = false;
-    sedativeUsed = false;
+    sedativeS1Taken = false;
+    sedativeS3Taken = false;
+    sedativeCount = 0;
     gaugeSpeedMultiplier = 1;
     gamePausedForItem = false;
     objectBActive = false;
     objectBSinking = false;
     objectBExploded = false;
     pit1Filled = false;
-    collidedWithF = false;
-    objectFActive = false;
-    objectFSinking = false;
-    pit2Filled = false;
+    collidedWithZone1Wall = false;
+    s2Zone1WallSinking = false;
+    s2Zone1WallGone = false;
+    collidedWithZone2Wall = false;
+    s2Zone2WallSinking = false;
+    s2Zone2WallGone = false;
+    collidedWithMud2 = false;
+    collidedWithZone3Wall = false;
     if(sedativeBtn) sedativeBtn.style.display = 'none';
+    if(sedativeBtn2) sedativeBtn2.style.display = 'none';
     if(sedativeStatusEl) sedativeStatusEl.classList.remove('show');
     gameStage = 1;
     ACTIVE_ZONES = STAGE1_ZONES;
+    ACTIVE_SHIELDS = [];
     ACTIVE_VIEWS = STAGE1_VIEWS;
     QUANTITIES = QUANTITIES_STAGE1;
     updateGaugeLabelsForStage();
@@ -2265,7 +2352,7 @@
           const rnd = pseudoRand(i*97.7 + 4.2);
           const impactM = rangeStart + rnd*rangeLen;
           const progress = localElapsed / hz.missileDuration;
-          const absorbed = (gameStage === 2) && isCoveredByShield(impactM, now);
+          const absorbed = (gameStage === 2 || gameStage === 3) && isCoveredByShield(impactM, now);
           const stopHeightM = absorbed ? getShieldHeightAt(impactM, now) : SHIELD_HEIGHT_M;
           missiles.push({impactM, progress, idx:i, absorbed, stopHeightM, cycleIndex:i});
         }
@@ -2288,7 +2375,7 @@
           const rnd = pseudoRand(i*61.3 + 7.7);
           const impactM = rangeStart + rnd*rangeLen;
           const progress = localElapsed / hz.missileDuration;
-          const absorbed = (gameStage === 2) && isCoveredByShield(impactM, now);
+          const absorbed = (gameStage === 2 || gameStage === 3) && isCoveredByShield(impactM, now);
           const stopHeightM = absorbed ? getShieldHeightAt(impactM, now) : SHIELD_HEIGHT_M;
           meteors.push({impactM, progress, idx:i, absorbed, stopHeightM, cycleIndex:i});
         }
@@ -2297,6 +2384,27 @@
         i++;
       }
       return {type:'meteor', active: meteors.length > 0, missiles: meteors, hz};
+    } else if(hz.type === 'airburst'){
+      const totalElapsed = Math.max(0, (now - bombOrigin)/1000);
+      const marginFrac = (1 - hz.randomRangeFrac)/2;
+      const rangeStart = hz.startM + (hz.endM-hz.startM)*marginFrac;
+      const rangeLen = (hz.endM-hz.startM)*hz.randomRangeFrac;
+      const bursts = [];
+      let t = 0;
+      let i = 0;
+      while(t < totalElapsed + hz.explosionDuration && i < 200000){
+        const localElapsed = totalElapsed - t;
+        if(localElapsed >= 0 && localElapsed < hz.explosionDuration){
+          const rnd = pseudoRand(i*83.1 + 5.9);
+          const posM = rangeStart + rnd*rangeLen;
+          const progress = localElapsed / hz.explosionDuration;
+          bursts.push({posM, progress, idx:i});
+        }
+        const gapRnd = pseudoRand(i*23.71 + 3.3);
+        t += hz.minGapSec + gapRnd*(hz.maxGapSec-hz.minGapSec);
+        i++;
+      }
+      return {type:'airburst', active: bursts.length > 0, bursts, hz};
     } else {
       const activeTotal = hz.count * hz.segDurationSec;
       const cycle = activeTotal + hz.pauseSec;
@@ -2355,6 +2463,10 @@
       if(bomb.type === 'missile' || bomb.type === 'meteor'){
         if(ballM < bomb.hz.startM || ballM > bomb.hz.endM) return false;
         return bomb.missiles.some((m)=> !m.absorbed && m.progress >= MISSILE_FALL_FRAC && Math.abs(ballM - m.impactM) <= MISSILE_BLAST_RADIUS_M);
+      }
+      if(bomb.type === 'airburst'){
+        if(ballM < bomb.hz.startM || ballM > bomb.hz.endM) return false;
+        return bomb.bursts.some((b)=> Math.abs(ballM - b.posM) <= MISSILE_BLAST_RADIUS_M);
       }
       if(bomb.type === 'nukes' && bomb.simultaneous){
         return bomb.segs.some((s)=> ballM >= s.segStartM && ballM < s.segEndM);
@@ -2427,6 +2539,13 @@
     const refY = mainLaneY - S3_HILL1_RISE*scalePx();
     ctx.fillStyle = '#8A6B4A';
     ctx.fillRect(0, refY, W, mainLaneY-refY);
+    if(stage !== 1){
+      // from 안전지대2 onward, split again at the valley floor's height so the
+      // climb above the valley (hill B's upper reaches) reads as a distinct tier
+      const refY2 = mainLaneY - S3_HEIGHT_VALLEY*scalePx();
+      ctx.fillStyle = '#5C6670';
+      ctx.fillRect(0, 0, W, refY2);
+    }
     ctx.restore();
 
     if(!s3ButtonPressed){
@@ -2436,7 +2555,7 @@
       drawS3Button(S3_BUTTON2_LEFT, S3_BUTTON2_RIGHT);
     }
 
-    if(stage === 2 && (mode === 'aiming' || mode === 'locked')){
+    if(stage !== 1 && (mode === 'aiming' || mode === 'locked')){
       const refLineY = mainLaneY - S3_HILL1_RISE*scalePx();
       ctx.strokeStyle = '#242220';
       ctx.setLineDash([5,4]);
@@ -2467,12 +2586,18 @@
     const heightLabels = [
       { m: (0 + S3_X_HILL1_START)/2, h: 0, refH: 0 }
     ];
-    if(stage !== 2){
+    if(stage === 1){
       heightLabels.push({ m: (S3_X_HILL1_END + S3_BUTTON_LEFT)/2, h: S3_HILL1_RISE, refH: 0 });
       heightLabels.push({ m: S3_X_HILL2_END + 1, h: S3_HEIGHT_HILL2_TOP, refH: 0 });
     }
-    heightLabels.push({ m: S3_X_HILLA_TOP, h: S3_HEIGHT_HILLA_TOP, refH: S3_HILL1_RISE });
-    heightLabels.push({ m: S3_X_HILLB_TOP, h: S3_HEIGHT_HILLB_TOP, refH: S3_HILL1_RISE });
+    if(stage !== 3){
+      heightLabels.push({ m: S3_X_HILLA_TOP, h: S3_HEIGHT_HILLA_TOP, refH: S3_HILL1_RISE });
+      heightLabels.push({ m: S3_X_HILLB_TOP, h: S3_HEIGHT_HILLB_TOP, refH: S3_HILL1_RISE });
+    }
+    if(stage === 3){
+      // only on the 안전지대2 aiming screen: valley floor to hill B's peak
+      heightLabels.push({ m: S3_X_HILLB_TOP + 3, h: S3_HEIGHT_HILLB_TOP, refH: S3_HEIGHT_VALLEY });
+    }
     heightLabels.forEach((lb)=>{
       const refH = lb.refH || 0;
       const displayH = lb.h - refH;
@@ -2511,6 +2636,36 @@
       ctx.fillText(label, x, midY+5);
       ctx.textAlign = 'left';
     });
+
+    if(stage === 3){
+      // horizontal gap: 안전지대2's right edge to 안전지대3's left edge
+      const gapStartM = S3_X_HILLB_TOP;
+      const gapEndM = S3_ZONE3_CENTER_M;
+      const gapM = gapEndM - gapStartM;
+      const gx1 = mToPx(gapStartM), gx2 = mToPx(gapEndM);
+      if(gx2 > -20 && gx1 < W+20){
+        const gy = groundYAtM((gapStartM+gapEndM)/2) - 22;
+        ctx.strokeStyle = '#A79F8C';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3,3]);
+        ctx.beginPath();
+        ctx.moveTo(gx1, gy);
+        ctx.lineTo(gx2, gy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(gx1, gy-6); ctx.lineTo(gx1, gy+6); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(gx2, gy-6); ctx.lineTo(gx2, gy+6); ctx.stroke();
+        const gMidX = (gx1+gx2)/2;
+        const gLabel = gapM.toFixed(1)+'m';
+        ctx.font = '700 20px "JetBrains Mono", monospace';
+        const gtw = ctx.measureText(gLabel).width;
+        ctx.fillStyle = '#F7F4EC';
+        ctx.fillRect(gMidX-gtw/2-6, gy-27, gtw+12, 22);
+        ctx.fillStyle = '#242220';
+        ctx.textAlign = 'left';
+        ctx.fillText(gLabel, gMidX-gtw/2, gy-10);
+      }
+    }
   }
 
   function drawGrid(){
@@ -3087,13 +3242,13 @@
   function drawShield(nowTs){
     const now = (typeof nowTs === 'number') ? nowTs : performance.now();
     const scale = scalePx();
-    const groundY = mainLaneY;
     const bands = getVisualShieldBands(now);
     const t = now/1000;
     ctx.save();
     bands.forEach((b)=>{
       const x1 = mToPx(b.startM), x2 = mToPx(b.endM);
       if(x2 <= x1) return;
+      const groundY = (gameStage === 3) ? groundYAtM((b.startM+b.endM)/2) : mainLaneY;
       const shieldY = groundY - (b.height||SHIELD_HEIGHT_M)*scale;
       const h = scale*0.55;
       const rgb = b.rgb, edgeRgb = b.edgeRgb;
@@ -3121,17 +3276,43 @@
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(x1, shieldY+h/2); ctx.lineTo(x1, groundY); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(x2, shieldY+h/2); ctx.lineTo(x2, groundY); ctx.stroke();
+
+      // speed label, tracking the band as it moves
+      if(typeof b.speed === 'number'){
+        ctx.globalAlpha = fadeAlpha;
+        const label = b.speed + 'm/s';
+        ctx.font = '700 12px "JetBrains Mono", monospace';
+        const labelX = (x1+x2)/2;
+        const labelY = shieldY - h/2 - 8;
+        const tw = ctx.measureText(label).width;
+        ctx.fillStyle = '#F7F4EC';
+        ctx.fillRect(labelX-tw/2-4, labelY-13, tw+8, 16);
+        ctx.fillStyle = 'rgb('+edgeRgb+')';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, labelX, labelY-2);
+        ctx.textAlign = 'left';
+      }
     });
     ctx.restore();
   }
 
-  function drawWall(){
+  function drawWallGeneric(leftM, thicknessM, heightM, groundY, sinkT){
     const scale = scalePx();
-    const x1 = mToPx(S2_WALL_LEFT_M);
-    const x2 = mToPx(S2_WALL_LEFT_M + S2_WALL_THICKNESS_M);
+    const x1 = mToPx(leftM);
+    const x2 = mToPx(leftM + thicknessM);
     if(x2 < -10 || x1 > W+10) return;
-    const wallH = S2_WALL_HEIGHT_M*scale;
-    const topY = mainLaneY - wallH;
+    const wallH = heightM*scale;
+    const sink = (typeof sinkT === 'number') ? Math.min(1, Math.max(0, sinkT)) : 0;
+    const eased = sink*sink*(3-2*sink);
+    const dy = eased * wallH;
+    const topY = groundY - wallH + dy;
+    ctx.save();
+    if(sink > 0){
+      // clip to above-ground so the wall visibly disappears beneath the dirt as it sinks
+      ctx.beginPath();
+      ctx.rect(0, 0, W, groundY);
+      ctx.clip();
+    }
     const grad = ctx.createLinearGradient(x1, 0, x2, 0);
     grad.addColorStop(0, '#1F7A4E');
     grad.addColorStop(0.5, '#2E9E63');
@@ -3151,6 +3332,11 @@
     // top highlight
     ctx.fillStyle = 'rgba(255,255,255,0.2)';
     ctx.fillRect(x1, topY, x2-x1, 3);
+    ctx.restore();
+  }
+
+  function drawWall3(){
+    drawWallGeneric(S3_WALL_LEFT_M, S3_WALL_THICKNESS_M, S3_WALL_HEIGHT_M, groundYAtM(S3_WALL_LEFT_M));
   }
 
   function drawPit(cxM){
@@ -3181,7 +3367,7 @@
     ctx.beginPath(); ctx.moveTo(cx-ballR, mainLaneY+0.5); ctx.lineTo(cx+ballR, mainLaneY+0.5); ctx.stroke();
   }
 
-  function drawMudLump(cx, groundY){
+  function drawMudLump(cx, groundY, massKg){
     const t = performance.now()/1000;
     const bob = Math.sin(t*2.0)*3;
     const w = 26, h = 15;
@@ -3209,8 +3395,25 @@
     ctx.font = '600 11px -apple-system, sans-serif';
     ctx.fillStyle = '#5A3A1E';
     ctx.textAlign = 'center';
-    ctx.fillText('2kg 진흙', cx, y-h/2-8);
+    ctx.fillText((massKg||S2_MUD_MASS_KG)+'kg 진흙', cx, y-h/2-8);
     ctx.textAlign = 'left';
+  }
+
+  function drawBallSpeedLabel(x, y, speedMps, dirSign, extraOffset){
+    if(typeof speedMps !== 'number' || speedMps <= 0.05) return;
+    const off = ballR + 5 + (extraOffset||0);
+    ctx.save();
+    ctx.font = '600 11px -apple-system, sans-serif';
+    ctx.fillStyle = '#242220';
+    if(dirSign >= 0){
+      ctx.textAlign = 'left';
+      ctx.fillText(speedMps.toFixed(2)+' m/s', x+off, y);
+    } else {
+      ctx.textAlign = 'right';
+      ctx.fillText(speedMps.toFixed(2)+' m/s', x-off, y);
+    }
+    ctx.textAlign = 'left';
+    ctx.restore();
   }
 
   function drawObjectB(m, speedMps, sinkT){
@@ -3319,29 +3522,56 @@
     } else if(hz.type === 'missile' || hz.type === 'meteor'){
       if(bomb.active && bomb.missiles.length){
         const x1 = mToPx(hz.startM), x2 = mToPx(hz.endM);
+        const groundYHz = (gameStage === 3) ? groundYAtM((hz.startM+hz.endM)/2) : mainLaneY;
         ctx.save();
         ctx.beginPath();
-        ctx.rect(Math.min(x1,x2), 0, Math.abs(x2-x1), mainLaneY);
+        ctx.rect(Math.min(x1,x2), 0, Math.abs(x2-x1), groundYHz);
         ctx.clip();
         bomb.missiles.forEach((m)=>{
           const cx = mToPx(m.impactM);
           const seed = m.impactM*3.1 + m.idx*0.7;
           if(m.progress < MISSILE_FALL_FRAC){
             const fallProgress = m.progress / MISSILE_FALL_FRAC;
-            const stopY = m.absorbed ? (mainLaneY - (m.stopHeightM||SHIELD_HEIGHT_M)*scalePx()) : mainLaneY;
+            const stopY = m.absorbed ? (groundYHz - (m.stopHeightM||SHIELD_HEIGHT_M)*scalePx()) : groundYHz;
             if(hz.type === 'meteor'){
-              drawMeteorFall(cx, mainLaneY, fallProgress, seed, stopY);
+              drawMeteorFall(cx, groundYHz, fallProgress, seed, stopY);
             } else {
-              drawMissileFall(cx, mainLaneY, fallProgress, seed, stopY);
+              drawMissileFall(cx, groundYHz, fallProgress, seed, stopY);
             }
           } else if(m.absorbed){
             const absorbProgress = (m.progress - MISSILE_FALL_FRAC) / (1 - MISSILE_FALL_FRAC);
-            drawShieldAbsorb(cx, mainLaneY, absorbProgress, m.stopHeightM);
+            drawShieldAbsorb(cx, groundYHz, absorbProgress, m.stopHeightM);
           } else {
             const explosionProgress = (m.progress - MISSILE_FALL_FRAC) / (1 - MISSILE_FALL_FRAC);
-            drawAirstrikeExplosion(cx, mainLaneY, explosionProgress, seed);
+            drawAirstrikeExplosion(cx, groundYHz, explosionProgress, seed);
           }
         });
+        ctx.restore();
+      }
+    } else if(hz.type === 'airburst'){
+      if(bomb.active && bomb.bursts.length){
+        bomb.bursts.forEach((b)=>{
+          const cx = mToPx(b.posM);
+          const seed = b.posM*3.1 + b.idx*0.7;
+          const groundYB = (gameStage === 3) ? groundYAtM(b.posM) : mainLaneY;
+          drawAirstrikeExplosion(cx, groundYB, b.progress, seed);
+        });
+      }
+    } else if(hz.effect === 'airstrike'){
+      if(bomb.active){
+        const hazardEndM = hz.baseM + hz.count*hz.segLenM;
+        const x1 = mToPx(hz.baseM), x2 = mToPx(hazardEndM);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(Math.min(x1,x2), 0, Math.abs(x2-x1), mainLaneY);
+        ctx.clip();
+        const segStartM = hz.baseM + bomb.idx*hz.segLenM;
+        const segEndM = segStartM + hz.segLenM;
+        const segCenterM = (segStartM+segEndM)/2;
+        const cxSeg = mToPx(segCenterM);
+        const groundYSeg = (gameStage === 3) ? groundYAtM(segCenterM) : mainLaneY;
+        const seed = segCenterM*3.1 + bomb.idx*0.7;
+        drawAirstrikeExplosion(cxSeg, groundYSeg, bomb.segProgress, seed);
         ctx.restore();
       }
     } else {
@@ -3603,9 +3833,7 @@
     if(gameStage === 3){ drawGrid3(); } else { drawGrid(); }
     if(gameStage === 2){
       const pit1CenterM = (S2_PIT1_LEFT_M + S2_PIT1_RIGHT_M) / 2;
-      const pit2CenterM = (S2_PIT2_LEFT_M + S2_PIT2_RIGHT_M) / 2;
       if(pit1Filled){ drawFilledPit(pit1CenterM); } else { drawPit(pit1CenterM); }
-      if(pit2Filled){ drawFilledPit(pit2CenterM); } else { drawPit(pit2CenterM); }
     }
     const cfg = currentStageCfg();
     Object.keys(ACTIVE_ZONES).forEach((key)=>{
@@ -3615,6 +3843,8 @@
           const zoneTop2 = S3_HEIGHT_HILLB_TOP;
           const zoneBottom2 = S3_HEIGHT_VALLEY;
           drawZone3(S3_X_HILLA_TOP, S3_X_HILLB_TOP, zoneBottom2, zoneTop2 - zoneBottom2, z.targetName, true);
+        } else if(key === '3'){
+          drawZone3(S3_ZONE3_LEFT_M, S3_ZONE3_RIGHT_M, S3_HEIGHT_HILLB_TOP, 3, z.targetName);
         } else {
           drawZone3(S3_X_HILL1_END, S3_X_HILL2_END, S3_HILL1_RISE, 3, z.targetName);
         }
@@ -3626,29 +3856,47 @@
     });
     if(gameStage === 2){
       drawShield(nowTs);
-      drawWall();
+      if(!s2Zone2WallGone){
+        const sinkTW2 = s2Zone2WallSinking ? (performance.now()-s2Zone2WallSinkStart)/2000 : 0;
+        drawWallGeneric(S2_ZONE2_WALL_LEFT_M, S2_WALL_THICKNESS_M, S2_WALL_HEIGHT_M, mainLaneY, sinkTW2);
+      }
+      drawWallGeneric(S2_ZONE3_WALL_LEFT_M, S2_WALL_THICKNESS_M, S2_WALL_HEIGHT_M, mainLaneY, 0);
+    }
+    if(gameStage === 3){
+      // the meteor hazard between 안전지대2 and 안전지대3 is drawn regardless of
+      // the current leg (like all zones' hazards); do the same for its shield —
+      // it just stays empty (ACTIVE_SHIELDS === []) until 안전지대2's aim begins
+      drawShield(nowTs);
+      drawWall3();
     }
     Object.keys(bombState).forEach((key)=>{
       drawHazard(bombState[key]);
     });
-    if(gameStage === 1 && !sedativeCollected){
+    if(gameStage === 1 && !sedativeS1Taken){
       drawPillItem(mToPx(SEDATIVE_M), mainLaneY);
     }
+    if(gameStage === 3 && !sedativeS3Taken){
+      drawPillItem(mToPx(S3_SEDATIVE_M), groundYAtM(S3_SEDATIVE_M));
+    }
     if(gameStage === 2 && !collidedWithMud){
-      drawMudLump(mToPx(S2_MUD_M), mainLaneY);
+      drawMudLump(mToPx(S2_MUD_M), mainLaneY, S2_MUD_MASS_KG);
+    }
+    if(gameStage === 2 && !collidedWithMud2){
+      drawMudLump(mToPx(S2_MUD2_M), mainLaneY, S2_MUD2_MASS_KG);
     }
     if(gameStage === 2 && objectBActive){
       const sinkT = objectBSinking ? (performance.now()-objectBSinkStart)/OBJECT_B_SINK_MS : 0;
       drawObjectB(objectBM, objectBV, sinkT);
     }
-    if(gameStage === 2 && objectFActive){
-      const sinkTF = objectFSinking ? (performance.now()-objectFSinkStart)/OBJECT_B_SINK_MS : 0;
-      drawObjectB(objectFM, objectFV, sinkTF);
+    if(gameStage === 2 && !s2Zone1WallGone){
+      const sinkTW = s2Zone1WallSinking ? (performance.now()-s2Zone1WallSinkStart)/2000 : 0;
+      drawWallGeneric(S2_ZONE1_WALL_LEFT_M, S2_WALL_THICKNESS_M, S2_WALL_HEIGHT_M, mainLaneY, sinkTW);
     }
     if(gameStage === 1){ drawDistanceLabel(); }
     if(gameStage === 2){
       drawS2ShieldRangeLabel(SHIELD1_TRACK_START_M, SHIELD1_TRACK_START_M + SHIELD1_TRACK_LEN_M);
       drawS2ShieldRangeLabel(SHIELD2_TRACK_START_M, SHIELD2_TRACK_START_M + SHIELD2_TRACK_LEN_M);
+      drawS2ShieldRangeLabel(SHIELD3_TRACK_START_M, SHIELD3_TRACK_START_M + SHIELD3_TRACK_LEN_M);
     }
     drawLegStart();
 
@@ -3674,6 +3922,9 @@
         if(mode === 'aiming' || mode === 'locked'){
           drawAimArrow(ballPx, groundY3-ballR*2);
         }
+        if(mode === 'flying'){
+          drawBallSpeedLabel(ballPx, groundY3-ballR, Math.abs(s3Vx), s3Vx >= 0 ? 1 : -1);
+        }
       } else if(mode === 'exploding'){
         const progress = Math.min(1, (performance.now()-explosionStart)/EXPLOSION_DURATION);
         drawExplosionAnim(ballPx, progress);
@@ -3693,6 +3944,9 @@
         drawLane(startPx, ballPx, mainLaneY, currentColor, 1, true);
         if(gameStage === 1 && mode === 'flying' && flightV > 0.1){
           drawGroundSparks(ballPx, mainLaneY, flightV);
+        }
+        if(mode === 'flying'){
+          drawBallSpeedLabel(ballPx, mainLaneY-ballR, flightV, 1, (gameStage === 2 && (collidedWithMud || collidedWithMud2)) ? ballR*1.3 : 0);
         }
       }
     } else if(mode === 'aiming' || mode === 'locked'){
@@ -3715,14 +3969,29 @@
       ctx.strokeRect(ballPx-ballR, mainLaneY-ballR*2, ballR*2, ballR*2);
     }
 
-    if(gameStage === 2 && collidedWithMud && (mode === 'flying' || mode === 'resting')){
-      const squash = collidedWithWall;
+    if(gameStage === 2 && (collidedWithMud || collidedWithMud2) && (mode === 'flying' || mode === 'resting')){
+      const isMud2 = collidedWithMud2;
+      const squash = isMud2 ? collidedWithZone3Wall : collidedWithZone2Wall;
+      const massLabel = (MASS + (isMud2 ? S2_MUD2_MASS_KG : S2_MUD_MASS_KG)) + 'kg';
+      let dy = 0;
+      if(!isMud2 && s2Zone2WallSinking){
+        // sinks below ground together with 안전지대2's wall as it goes down
+        const sinkProg = Math.min(1, (performance.now()-s2Zone2WallSinkStart)/2000);
+        const eased = sinkProg*sinkProg*(3-2*sinkProg);
+        dy = eased * (S2_WALL_HEIGHT_M*scalePx());
+      }
+      ctx.save();
+      if(dy > 0){
+        ctx.beginPath();
+        ctx.rect(0, 0, W, mainLaneY);
+        ctx.clip();
+      }
       const rightCx = ballPx + ballR*1.5;
-      const rightCy = mainLaneY - ballR*1.3;
+      const rightCy = mainLaneY - ballR*1.3 + dy;
       const rightRx = squash ? ballR*0.4 : ballR*0.7;
       const rightRy = squash ? ballR*1.6 : ballR*1.3;
       const topCx = ballPx + ballR*0.5;
-      const topCy = mainLaneY - ballR*2;
+      const topCy = mainLaneY - ballR*2 + dy;
       const topRx = ballR*0.8;
       const topRy = ballR*0.6;
       ctx.fillStyle = '#7A5230';
@@ -3737,12 +4006,11 @@
       ctx.font = '700 11px -apple-system, sans-serif';
       ctx.fillStyle = '#8E5A2E';
       ctx.textAlign = 'center';
-      ctx.fillText('4kg', ballPx, mainLaneY-ballR*2-topRy-8);
-      ctx.font = '600 11px -apple-system, sans-serif';
-      ctx.fillStyle = '#242220';
+      if(!squash){
+        ctx.fillText(massLabel, ballPx, mainLaneY-ballR*2-topRy-8+dy);
+      }
       ctx.textAlign = 'left';
-      ctx.fillText(flightV.toFixed(2)+' m/s', rightCx+rightRx+5, mainLaneY-ballR);
-      ctx.textAlign = 'left';
+      ctx.restore();
     }
 
     drawMinimap(bombState);
@@ -3781,7 +4049,7 @@
     ctx.strokeStyle = '#B7AD95'; ctx.lineWidth = 1;
     ctx.beginPath();
     if(gameStage === 3){
-      const bps = [0, S3_X_HILL1_START, S3_X_HILL1_END, S3_BUTTON_LEFT, S3_BUTTON_RIGHT, S3_X_FLAT2_END, S3_X_HILL2_END, S3_X_FLAT3_END, S3_X_HILLA_TOP, S3_X_VALLEY_FLAT_START, S3_X_VALLEY_FLAT_END, S3_X_HILLB_TOP, S3_X_HILLB_DOWN_END, worldEndM];
+      const bps = [0, S3_X_HILL1_START, S3_X_HILL1_END, S3_BUTTON_LEFT, S3_BUTTON_RIGHT, S3_X_FLAT2_END, S3_X_HILL2_END, S3_X_FLAT3_END, S3_X_HILLA_TOP, S3_X_VALLEY_FLAT_START, S3_X_VALLEY_FLAT_END, S3_X_HILLB_TOP, worldEndM];
       ctx.moveTo(mapX(bps[0]), mapY(bps[0]));
       bps.slice(1).forEach(bp => ctx.lineTo(mapX(bp), mapY(bp)));
     } else {
@@ -3838,6 +4106,8 @@
               ctx.beginPath(); ctx.arc(mx, mapY(m.impactM), Math.max(2,mmH*0.1), 0, Math.PI*2); ctx.fill();
             }
           });
+        } else if(b.type === 'airburst'){
+          // intentionally not drawn — overlaps 안전지대3 label on the minimap
         } else if(b.type === 'nukes' && b.simultaneous){
           b.segs.forEach((s)=>{
             const sx1 = mapX(s.segStartM), sx2 = mapX(s.segEndM);
@@ -3856,10 +4126,16 @@
     ctx.beginPath(); ctx.arc(mapX(0), mapY(0), Math.max(1.5, mmH*0.06), 0, Math.PI*2); ctx.fill();
 
     // item marker (gold)
-    if(gameStage === 1 && !sedativeCollected){
+    if(gameStage === 1 && !sedativeS1Taken){
       const ix = mapX(SEDATIVE_M);
       ctx.fillStyle = '#F0B429';
       ctx.beginPath(); ctx.arc(ix, mapY(SEDATIVE_M), Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#8A5F0E'; ctx.lineWidth = 1; ctx.stroke();
+    }
+    if(gameStage === 3 && !sedativeS3Taken){
+      const ix3 = mapX(S3_SEDATIVE_M);
+      ctx.fillStyle = '#F0B429';
+      ctx.beginPath(); ctx.arc(ix3, mapY(S3_SEDATIVE_M), Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
       ctx.strokeStyle = '#8A5F0E'; ctx.lineWidth = 1; ctx.stroke();
     }
 
@@ -3871,16 +4147,16 @@
         ctx.beginPath(); ctx.arc(mx, mapY(S2_MUD_M), Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
         ctx.strokeStyle = '#4A3018'; ctx.lineWidth = 1; ctx.stroke();
       }
+      if(!collidedWithMud2){
+        const mx2 = mapX(S2_MUD2_M);
+        ctx.fillStyle = '#7A5230';
+        ctx.beginPath(); ctx.arc(mx2, mapY(S2_MUD2_M), Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#4A3018'; ctx.lineWidth = 1; ctx.stroke();
+      }
       if(objectBActive){
         const bx = mapX(objectBM);
         ctx.fillStyle = '#B94A4A';
         ctx.beginPath(); ctx.arc(bx, mapY(objectBM), Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
-        ctx.strokeStyle = '#242220'; ctx.lineWidth = 1; ctx.stroke();
-      }
-      if(objectFActive){
-        const fx = mapX(objectFM);
-        ctx.fillStyle = '#B94A4A';
-        ctx.beginPath(); ctx.arc(fx, mapY(objectFM), Math.max(2, mmH*0.09), 0, Math.PI*2); ctx.fill();
         ctx.strokeStyle = '#242220'; ctx.lineWidth = 1; ctx.stroke();
       }
     }
@@ -4035,7 +4311,7 @@
     mode = 'exploding';
     gameOverReason = 'bomb';
     explosionStart = performance.now();
-    deathDistanceM = lastSafeDistanceM;
+    deathDistanceM = distanceOffsetM + ballM;
     deathElapsedMs = gameStartTime !== null ? (performance.now() - gameStartTime) : 0;
     mainBtn.disabled = true;
     mainBtn.textContent = '\u00A0';
@@ -4049,7 +4325,7 @@
   function triggerPitGameOver(){
     mode = 'gameover';
     gameOverReason = 'pit';
-    deathDistanceM = lastSafeDistanceM;
+    deathDistanceM = distanceOffsetM + ballM;
     deathElapsedMs = gameStartTime !== null ? (performance.now() - gameStartTime) : 0;
     stopBgLoop();
     playGameOverSting();
@@ -4066,7 +4342,7 @@
   function triggerBoundaryGameOver(){
     mode = 'gameover';
     gameOverReason = 'boundary';
-    deathDistanceM = lastSafeDistanceM;
+    deathDistanceM = distanceOffsetM + ballM;
     deathElapsedMs = gameStartTime !== null ? (performance.now() - gameStartTime) : 0;
     stopBgLoop();
     playGameOverSting();
@@ -4102,24 +4378,31 @@
     distanceOffsetM = 0;
     lastSafeDistanceM = 0;
     clearedStages = [];
-    sedativeCollected = false;
-    sedativeUsed = false;
+    sedativeS1Taken = false;
+    sedativeS3Taken = false;
+    sedativeCount = 0;
     gaugeSpeedMultiplier = 1;
     gamePausedForItem = false;
     objectBActive = false;
     objectBSinking = false;
     objectBExploded = false;
     pit1Filled = false;
-    collidedWithF = false;
-    objectFActive = false;
-    objectFSinking = false;
-    pit2Filled = false;
+    collidedWithZone1Wall = false;
+    s2Zone1WallSinking = false;
+    s2Zone1WallGone = false;
+    collidedWithZone2Wall = false;
+    s2Zone2WallSinking = false;
+    s2Zone2WallGone = false;
+    collidedWithMud2 = false;
+    collidedWithZone3Wall = false;
     collidedWithMud = false;
     collidedWithWall = false;
     if(sedativeBtn) sedativeBtn.style.display = 'none';
+    if(sedativeBtn2) sedativeBtn2.style.display = 'none';
     if(sedativeStatusEl) sedativeStatusEl.classList.remove('show');
     gameStage = 1;
     ACTIVE_ZONES = STAGE1_ZONES;
+    ACTIVE_SHIELDS = [];
     ACTIVE_VIEWS = STAGE1_VIEWS;
     QUANTITIES = QUANTITIES_STAGE1;
     updateGaugeLabelsForStage();
@@ -4158,8 +4441,10 @@
     updateBallR();
     updateMainLaneY();
 
-    if(gameStage === 1 && sedativeCollected && !sedativeUsed && !gamePausedForItem){
-      sedativeBtn.style.display = (mode === 'aiming') ? 'flex' : 'none';
+    if(!gamePausedForItem){
+      const showSedativeBtns = (mode === 'aiming') && sedativeCount > 0;
+      sedativeBtn.style.display = showSedativeBtns ? 'flex' : 'none';
+      sedativeBtn2.style.display = (showSedativeBtns && sedativeCount > 1) ? 'flex' : 'none';
     }
 
     if(!gamePausedForItem){
@@ -4174,7 +4459,7 @@
         if(gameStage === 3){
           const ballR_m3 = ballR/scalePx();
           const willHitButtonWall = (stage === 1) && (ballM - ballR_m3 > S3_BUTTON_RIGHT) && (s3Vx < 0) && ((ballM + s3Vx*dt) - ballR_m3 <= S3_BUTTON_RIGHT);
-          const willHitButton2Wall = (ballM - ballR_m3 > S3_BUTTON2_RIGHT) && (s3Vx < 0) && ((ballM + s3Vx*dt) - ballR_m3 <= S3_BUTTON2_RIGHT);
+          const willHitButton2Wall = (stage !== 3) && (ballM - ballR_m3 > S3_BUTTON2_RIGHT) && (s3Vx < 0) && ((ballM + s3Vx*dt) - ballR_m3 <= S3_BUTTON2_RIGHT);
           if(willHitButtonWall){
             ballM = S3_BUTTON_RIGHT + ballR_m3;
             s3Vx = 0;
@@ -4195,7 +4480,20 @@
             collidedWithWall = true;
             mode = 'resting';
             resultEl.className = 'result success';
-            resultEl.textContent = '버튼 벽에 충돌했습니다! 잠시 후 스테이지가 클리어됩니다…';
+            resultEl.textContent = '버튼 벽에 충돌했습니다! 안전지대2 통과, 곧바로 안전지대3으로 이동합니다…';
+            mainBtn.disabled = true;
+            mainBtn.textContent = '안전지대3로 자동 이동 중…';
+            mainBtn.onclick = null;
+            playWallImpactSound();
+            setTimeout(()=>{ if(mode === 'resting' && stage === 2) startS3Zone3(); }, 900);
+          } else if(!collidedWithWall && (ballM + s3Vx*dt) + ballR_m3 >= S3_WALL_LEFT_M && ballM + ballR_m3 < S3_WALL_LEFT_M){
+            ballM = S3_WALL_LEFT_M - ballR_m3;
+            s3Vx = 0;
+            flightV = 0;
+            collidedWithWall = true;
+            mode = 'resting';
+            resultEl.className = 'result success';
+            resultEl.textContent = '벽에 충돌했습니다! 잠시 후 스테이지가 클리어됩니다…';
             mainBtn.disabled = true;
             mainBtn.textContent = '\u00A0';
             mainBtn.onclick = null;
@@ -4216,12 +4514,28 @@
               s3Vx = s3Vx * (cosAfter/cosBefore);
             }
             flightV = Math.abs(s3Vx);
-            if(ballM < -3 || ballM > S3_WORLD_END_M){
+            if(s3Vx < 0 && ballM <= legStartM){
+              // too weak to crest the incline ahead — rolled all the way back to
+              // where this shot started; stop it there and call a foul, same as stage1
+              ballM = legStartM;
+              s3Vx = 0;
+              flightV = 0;
+              mode = 'resting';
+              resultEl.className = 'result fail';
+              resultEl.textContent = '파울! 발사가 너무 약해서 앞의 오르막을 넘지 못했습니다. 다시 도전해보세요.';
+              mainBtn.disabled = false;
+              mainBtn.textContent = '다시 도전';
+              mainBtn.onclick = startNewShot;
+              showFoulOverlay();
+            } else if(ballM < -3 || ballM > S3_WORLD_END_M){
               triggerBoundaryGameOver();
             }
           }
           s3ButtonPressed = (ballM + ballR_m3 > S3_BUTTON_LEFT) && (ballM - ballR_m3 < S3_BUTTON_RIGHT);
           s3Button2Pressed = (ballM + ballR_m3 > S3_BUTTON2_LEFT) && (ballM - ballR_m3 < S3_BUTTON2_RIGHT);
+          if(stage === 1 && !sedativeS3Taken && ballM >= S3_SEDATIVE_M){
+            collectSedative('s3');
+          }
         } else {
         ballM += flightV*dt;
         flightV = Math.max(0, flightV - flightDecel*dt);
@@ -4258,28 +4572,64 @@
             mainBtn.textContent = '\u00A0';
             mainBtn.onclick = null;
             setTimeout(()=>{ triggerPitGameOver(); }, OBJECT_B_SINK_MS + 2000);
-          } else if(!collidedWithF){
-            const collidePointM = S2_OBJECT_F_LEFT_M - ballR_m2;
-            if(ballM >= collidePointM){
-              ballM = collidePointM;
-              objectFV = flightV;
+          } else if(!collidedWithZone1Wall){
+            if(ballM + ballR_m2 >= S2_ZONE1_WALL_LEFT_M){
+              ballM = S2_ZONE1_WALL_LEFT_M - ballR_m2;
               flightV = 0;
-              collidedWithF = true;
+              collidedWithZone1Wall = true;
               mode = 'resting';
               resultEl.className = 'result success';
-              resultEl.textContent = '물체F와 충돌했습니다! 물체F가 구덩이에 빠질 때까지 잠시 기다려주세요…';
+              resultEl.textContent = '벽에 충돌했습니다! 잠시 후 벽이 가라앉습니다…';
               mainBtn.disabled = true;
-              mainBtn.textContent = '대기 중…';
+              mainBtn.textContent = '\u00A0';
               mainBtn.onclick = null;
+              playWallImpactSound();
+              setTimeout(()=>{
+                if(mode === 'resting' && stage === 2 && collidedWithZone1Wall){
+                  s2Zone1WallSinking = true;
+                  s2Zone1WallSinkStart = performance.now();
+                  resultEl.textContent = '벽이 가라앉고 있습니다…';
+                }
+              }, 2000);
             }
           }
         }
 
         if(gameStage === 2 && stage === 3){
-          if(mode === 'flying' && !collidedWithWall && ballM + ballR_m2 >= S2_WALL_LEFT_M){
-            ballM = S2_WALL_LEFT_M - ballR_m2;
+          if(mode === 'flying' && !collidedWithZone2Wall && ballM + ballR_m2 >= S2_ZONE2_WALL_LEFT_M){
+            ballM = S2_ZONE2_WALL_LEFT_M - ballR_m2;
             flightV = 0;
-            collidedWithWall = true;
+            collidedWithZone2Wall = true;
+            mode = 'resting';
+            resultEl.className = 'result success';
+            resultEl.textContent = '벽에 충돌했습니다! 잠시 후 벽이 가라앉습니다…';
+            mainBtn.disabled = true;
+            mainBtn.textContent = '\u00A0';
+            mainBtn.onclick = null;
+            playWallImpactSound();
+            setTimeout(()=>{
+              if(mode === 'resting' && stage === 3 && collidedWithZone2Wall){
+                s2Zone2WallSinking = true;
+                s2Zone2WallSinkStart = performance.now();
+                resultEl.textContent = '벽이 가라앉고 있습니다…';
+              }
+            }, 2000);
+          }
+
+          if(!collidedWithMud && ballM >= S2_MUD_M){
+            // perfectly inelastic collision: 2kg ball + 2kg mud -> 4kg combined
+            preMudCollisionV = flightV;
+            flightV = flightV * (MASS/(MASS+S2_MUD_MASS_KG));
+            collidedWithMud = true;
+            playMudSquelchSound();
+          }
+        }
+
+        if(gameStage === 2 && stage === 4){
+          if(mode === 'flying' && !collidedWithZone3Wall && ballM + ballR_m2 >= S2_ZONE3_WALL_LEFT_M){
+            ballM = S2_ZONE3_WALL_LEFT_M - ballR_m2;
+            flightV = 0;
+            collidedWithZone3Wall = true;
             mode = 'resting';
             resultEl.className = 'result success';
             resultEl.textContent = '벽에 충돌했습니다! 잠시 후 스테이지가 클리어됩니다…';
@@ -4290,20 +4640,20 @@
             setTimeout(()=>{
               clearedStages.push(2);
               showStageClearOverlay('stage2: 충돌의 구역 클리어', 'stage3으로 가기', startGameStage3);
-            }, 1000);
+            }, 2000);
           }
 
-          if(!collidedWithMud && ballM >= S2_MUD_M){
-            // perfectly inelastic collision: 2kg ball + 2kg mud -> 4kg combined
-            preMudCollisionV = flightV;
-            flightV = flightV * (2/(2+2));
-            collidedWithMud = true;
+          if(!collidedWithMud2 && ballM >= S2_MUD2_M){
+            // perfectly inelastic collision: 2kg ball + 4kg mud -> 6kg combined
+            preMudCollisionV2 = flightV;
+            flightV = flightV * (MASS/(MASS+S2_MUD2_MASS_KG));
+            collidedWithMud2 = true;
             playMudSquelchSound();
           }
         }
 
-        if(gameStage === 1 && !sedativeCollected && ballM >= SEDATIVE_M){
-          collectSedative();
+        if(gameStage === 1 && !sedativeS1Taken && ballM >= SEDATIVE_M){
+          collectSedative('s1');
         }
 
         if(mode === 'flying' && !collidedWithWall){
@@ -4352,27 +4702,32 @@
       }
     }
 
-    if(gameStage === 2 && objectFActive && !objectFSinking){
-      objectFM += objectFV*dt;
-      if(objectFM >= S2_PIT2_LEFT_M){
-        objectFM = (S2_PIT2_LEFT_M + S2_PIT2_RIGHT_M) / 2;
-        objectFSinking = true;
-        objectFSinkStart = performance.now();
-      }
-    } else if(gameStage === 2 && objectFSinking){
-      const sinkTF = (performance.now() - objectFSinkStart) / OBJECT_B_SINK_MS;
-      if(sinkTF >= 1){
-        objectFActive = false;
-        objectFSinking = false;
-        pit2Filled = true;
+    if(gameStage === 2 && s2Zone1WallSinking){
+      const sinkTW = (performance.now() - s2Zone1WallSinkStart) / 2000;
+      if(sinkTW >= 1){
+        s2Zone1WallSinking = false;
+        s2Zone1WallGone = true;
         playShieldFadeSound();
         if(mode === 'resting' && stage === 2){
-          setTimeout(()=>{ if(mode === 'resting' && stage === 2) startS2Stage3(); }, 2000);
+          setTimeout(()=>{ if(mode === 'resting' && stage === 2) startS2Stage3(); }, 1000);
         }
       }
     }
 
-    const ballShielded = gameStage === 2 && isCoveredByShield(ballM, bombNow);
+    if(gameStage === 2 && s2Zone2WallSinking){
+      const sinkTW2 = (performance.now() - s2Zone2WallSinkStart) / 2000;
+      if(sinkTW2 >= 1){
+        s2Zone2WallSinking = false;
+        s2Zone2WallGone = true;
+        collidedWithMud = false;
+        playShieldFadeSound();
+        if(mode === 'resting' && stage === 3){
+          setTimeout(()=>{ if(mode === 'resting' && stage === 3) startS2Stage4(); }, 1000);
+        }
+      }
+    }
+
+    const ballShielded = (gameStage === 2 || gameStage === 3) && isCoveredByShield(ballM, bombNow);
     if(!gamePausedForItem && !ballShielded && (mode === 'flying' || mode === 'resting') && isHazardHit(bomb)){
       triggerGameOver();
     }
@@ -4387,20 +4742,38 @@
             b.missiles.forEach((m)=>{
               const soundKey = m.cycleIndex+'-'+m.idx;
               if(m.progress >= MISSILE_FALL_FRAC && !prev.explodedSet.has(soundKey)){
-                if(!m.absorbed) playExplosionSound();
+                if(!m.absorbed && isMInView(m.impactM)) playExplosionSound();
                 prev.explodedSet.add(soundKey);
               }
             });
           } else {
             prev.explodedSet.clear();
           }
+        } else if(b.type === 'airburst'){
+          if(b.active){
+            b.bursts.forEach((burst)=>{
+              if(burst.progress < 0.1 && !prev.explodedSet.has(burst.idx)){
+                if(isMInView(burst.posM)) playExplosionSound();
+                prev.explodedSet.add(burst.idx);
+              }
+            });
+          } else {
+            prev.explodedSet.clear();
+          }
         } else if(b.type === 'nukes' && b.simultaneous){
-          if(b.active && !prev.active) playNukeExplosionSound();
+          if(b.active && !prev.active){
+            const anyVisible = b.segs.some((s)=> isMInView((s.segStartM+s.segEndM)/2));
+            if(anyVisible) playNukeExplosionSound();
+          }
         } else if(b.active){
           const idxNow = (typeof b.idx === 'number') ? b.idx : 0;
           if(!prev.active || idxNow !== prev.idx){
-            if(b.type === 'nukes') playNukeExplosionSound();
-            else playExplosionSound();
+            const posM = (typeof b.segStartM === 'number') ? (b.segStartM+b.segEndM)/2 : null;
+            const visible = posM === null ? true : isMInView(posM);
+            if(visible){
+              if(b.type === 'nukes') playNukeExplosionSound();
+              else playExplosionSound();
+            }
           }
           prev.idx = idxNow;
         } else {
@@ -4479,6 +4852,7 @@
     } else {
       gameStage = 1;
       ACTIVE_ZONES = STAGE1_ZONES;
+      ACTIVE_SHIELDS = [];
       ACTIVE_VIEWS = STAGE1_VIEWS;
       QUANTITIES = QUANTITIES_STAGE1;
       stage = 1;
