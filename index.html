@@ -779,7 +779,7 @@
           <button type="button" class="sound-btn" id="soundBtn" aria-label="사운드">🔈</button>
           <button type="button" class="back-btn" id="backToSelectBtn">돌아가기</button>
         </div>
-        <div class="mass-badge" id="massBadge"><span id="gravityLine" style="display:none;">중력가속도=<b class="mono">10m/s²</b><br></span><span id="frictionLine" style="display:none;">마찰력=<b class="mono">4N</b><br></span>물체 질량=<b class="mono">2kg</b><br>눈금 한 칸=<b class="mono">1m</b><span id="s2CollisionLegend" style="display:none;"><br><span style="display:inline-block;width:14px;height:14px;background:#B94A4A;border:1px solid #242220;vertical-align:middle;"></span> → 탄성충돌<br><svg width="20" height="12" viewBox="0 0 40 24" style="vertical-align:middle;"><ellipse cx="20" cy="15" rx="13" ry="7.5" fill="#7A5230"/><ellipse cx="12" cy="17" rx="8.1" ry="5.8" fill="#7A5230"/><ellipse cx="28" cy="17" rx="7.6" ry="5.8" fill="#7A5230"/><ellipse cx="16" cy="10" rx="7.2" ry="4.7" fill="#8E6440" transform="rotate(-11 16 10)"/><ellipse cx="20" cy="15" rx="13" ry="7.5" fill="none" stroke="rgba(50,32,18,0.5)" stroke-width="1"/></svg> → 완전비탄성 충돌</span></div>
+        <div class="mass-badge" id="massBadge"><span id="gravityLine" style="display:none;">중력가속도=<b class="mono">10m/s²</b><br></span><span id="frictionLine" style="display:none;">마찰력=<b class="mono">4N</b><br></span><span id="s2CollisionLegend" style="display:none;"><span style="display:inline-block;width:14px;height:14px;background:#B94A4A;border:1px solid #242220;vertical-align:middle;"></span> → 탄성충돌<br><svg width="20" height="12" viewBox="0 0 40 24" style="vertical-align:middle;"><ellipse cx="20" cy="15" rx="13" ry="7.5" fill="#7A5230"/><ellipse cx="12" cy="17" rx="8.1" ry="5.8" fill="#7A5230"/><ellipse cx="28" cy="17" rx="7.6" ry="5.8" fill="#7A5230"/><ellipse cx="16" cy="10" rx="7.2" ry="4.7" fill="#8E6440" transform="rotate(-11 16 10)"/><ellipse cx="20" cy="15" rx="13" ry="7.5" fill="none" stroke="rgba(50,32,18,0.5)" stroke-width="1"/></svg> → 완전비탄성 충돌<br></span>물체 질량=<b class="mono">2kg</b><br>눈금 한 칸=<b class="mono">1m</b></div>
       </div>
       <div class="play-timer"><span id="playTimer">00:00</span> · <span id="playDistance">0.0 m</span></div>
       <div class="sedative-status" id="sedativeStatus">신경안정제 사용 중</div>
@@ -1018,27 +1018,27 @@
   const S2_ZONE2_WALL_LEFT_M = S2_ZONE2_RIGHT_M; // 48 — flush against the right edge of 안전지대2 (sinks, like 안전지대1's)
   const S2_MUD2_M = S2_ZONE2_RIGHT_M + 2; // 50 — mirrors S2_MUD_M's offset from 안전지대1
   const S2_METEOR2_START_M = S2_ZONE2_RIGHT_M + 3; // 51 — mirrors S2_METEOR_START_M's offset
-  const S2_METEOR2_END_M = S2_ZONE2_RIGHT_M + 22; // 70 — mirrors S2_METEOR_END_M's offset
-  const S2_ZONE3_LEFT_M = S2_METEOR2_END_M; // 70
-  const S2_ZONE3_RIGHT_M = S2_ZONE2_RIGHT_M + 24; // 72
-  const S2_ZONE3_WALL_LEFT_M = S2_ZONE3_RIGHT_M; // 72 — final wall, never sinks
+  const S2_METEOR2_END_M = S2_ZONE2_RIGHT_M + 37; // 85
+  const S2_ZONE3_LEFT_M = S2_METEOR2_END_M; // 85
+  const S2_ZONE3_RIGHT_M = S2_ZONE2_RIGHT_M + 39; // 87
+  const S2_ZONE3_WALL_LEFT_M = S2_ZONE3_RIGHT_M; // 87 — final wall, never sinks
   const S2_WALL_THICKNESS_M = 1;
-  const S2_WALL_HEIGHT_M = 3;
+  const S2_WALL_HEIGHT_M = 1.5;
   const OBJECT_B_SINK_MS = 550;
 
   const SHIELD_LEN_M = 4; // reduced 1m from the original 5m width
   const SHIELD_SPEED_MPS = 4;
   const SHIELD_HEIGHT_M = 2;
-  const SHIELD1_TRACK_START_M = S2_MISSILE_START_M; // 3
-  const SHIELD1_TRACK_LEN_M = S2_ZONE1_CENTER_M - S2_MISSILE_START_M; // 20 (cycles within [3,23])
+  const SHIELD1_TRACK_START_M = 0; // range: 출발점 ~ 안전지대1의 오른쪽 경계
+  const SHIELD1_TRACK_LEN_M = S2_ZONE1_RIGHT_M - 0;
   const SHIELD2_SPEED_MPS = 5;
-  const SHIELD2_TRACK_START_M = S2_METEOR_START_M; // 28
-  const SHIELD2_TRACK_LEN_M = 20; // cycles within [28,48]
+  const SHIELD2_TRACK_START_M = S2_ZONE1_RIGHT_M; // range: 안전지대1의 오른쪽 경계 ~ 안전지대2의 오른쪽 경계
+  const SHIELD2_TRACK_LEN_M = S2_ZONE2_RIGHT_M - S2_ZONE1_RIGHT_M;
   const SHIELD3_SPEED_MPS = SHIELD2_SPEED_MPS; // identical to 보호막2
-  const SHIELD3_TRACK_START_M = S2_METEOR2_START_M; // mirrors SHIELD2's offset from its meteor field
-  const SHIELD3_TRACK_LEN_M = 20;
+  const SHIELD3_TRACK_START_M = S2_ZONE2_RIGHT_M; // range: 안전지대2의 오른쪽 경계 ~ 안전지대3의 오른쪽 경계
+  const SHIELD3_TRACK_LEN_M = S2_ZONE3_RIGHT_M - S2_ZONE2_RIGHT_M;
   const SHIELDS = [
-    { speed: SHIELD_SPEED_MPS, trackStart: SHIELD1_TRACK_START_M, trackLen: SHIELD1_TRACK_LEN_M, rgb: '30,120,195', edgeRgb: '110,180,225', height: SHIELD_HEIGHT_M },
+    { speed: SHIELD_SPEED_MPS, trackStart: SHIELD1_TRACK_START_M, trackLen: SHIELD1_TRACK_LEN_M, rgb: '25,140,55', edgeRgb: '110,200,120', height: SHIELD_HEIGHT_M },
     { speed: SHIELD2_SPEED_MPS, trackStart: SHIELD2_TRACK_START_M, trackLen: SHIELD2_TRACK_LEN_M, rgb: '25,140,55', edgeRgb: '110,200,120', height: SHIELD_HEIGHT_M },
     { speed: SHIELD3_SPEED_MPS, trackStart: SHIELD3_TRACK_START_M, trackLen: SHIELD3_TRACK_LEN_M, rgb: '25,140,55', edgeRgb: '110,200,120', height: SHIELD_HEIGHT_M }
   ];
@@ -1066,7 +1066,7 @@
       targetRightM: S2_ZONE3_RIGHT_M,
       targetName: '안전지대3',
       isLast: true,
-      hazard: {type:'meteor', startM:S2_METEOR2_START_M, endM:S2_METEOR2_END_M, randomRangeFrac:1.0, missileDuration:0.9, minGapSec:0.08, maxGapSec:0.12}
+      hazard: {type:'meteor', startM:S2_METEOR2_START_M, endM:S2_METEOR2_END_M, randomRangeFrac:1.0, missileDuration:0.9, minGapSec:0.05, maxGapSec:0.07}
     }
   };
   const STAGE2_VIEWS = {
@@ -1147,12 +1147,12 @@
   // with it clears stage3
   const S3_WALL_LEFT_M = S3_ZONE3_RIGHT_M;
   const S3_WALL_THICKNESS_M = 1;
-  const S3_WALL_HEIGHT_M = 3;
+  const S3_WALL_HEIGHT_M = 1.5;
 
-  // shield cycling rightward between 안전지대2's right edge and 안전지대3's center,
-  // same shape/look as stage2's 보호막1, but at 6 m/s
+  // shield bouncing back and forth between a point 4m right of 안전지대2's left
+  // edge and 안전지대3's right edge, same shape/look as stage2's shields, at 6 m/s
   const STAGE3_ZONE3_SHIELDS = [
-    { speed: 6, trackStart: S3_X_HILLB_TOP, trackLen: S3_ZONE3_CENTER_M - S3_X_HILLB_TOP, rgb: '30,120,195', edgeRgb: '110,180,225', height: SHIELD_HEIGHT_M }
+    { speed: 6, trackStart: S3_X_HILLA_TOP + 4, trackLen: S3_ZONE3_RIGHT_M - (S3_X_HILLA_TOP + 4), rgb: '25,140,55', edgeRgb: '110,200,120', height: SHIELD_HEIGHT_M }
   ];
 
   // smooth S-curve: 0 at t=0, 1 at t=1, zero slope at both ends — used so every hill/valley
@@ -1479,17 +1479,15 @@
   // ---- Stage2: invincible shields that cycle along their own track ----
   function getShieldBandsForConfig(now, cfg){
     const elapsed = Math.max(0, (now - bombOrigin)/1000);
-    const s = cfg.speed * elapsed;
-    const front = s % cfg.trackLen;
-    if(front >= SHIELD_LEN_M){
-      return [{startM: cfg.trackStart + front - SHIELD_LEN_M, endM: cfg.trackStart + front}];
+    const range = Math.max(0, cfg.trackLen - SHIELD_LEN_M);
+    if(range <= 0){
+      return [{startM: cfg.trackStart, endM: cfg.trackStart + cfg.trackLen}];
     }
-    const bands = [{startM: cfg.trackStart, endM: cfg.trackStart + front}];
-    const wrapStart = cfg.trackLen - (SHIELD_LEN_M - front);
-    if(wrapStart < cfg.trackLen){
-      bands.push({startM: cfg.trackStart + wrapStart, endM: cfg.trackStart + cfg.trackLen});
-    }
-    return bands;
+    const period = 2*range;
+    const cyclePos = (cfg.speed * elapsed) % period;
+    const leftLocal = cyclePos <= range ? cyclePos : (period - cyclePos);
+    const startM = cfg.trackStart + leftLocal;
+    return [{startM, endM: startM + SHIELD_LEN_M}];
   }
 
   function getAllShieldBands(now){
@@ -2107,6 +2105,7 @@
     collidedWithMud = false;
     collidedWithMud2 = false;
     collidedWithWall = false;
+    sedativeStatusEl.classList.remove('show');
     hideFoulOverlay();
     mainBtn.disabled = false;
     mainBtn.textContent = '고정 (Space)';
@@ -2636,36 +2635,6 @@
       ctx.fillText(label, x, midY+5);
       ctx.textAlign = 'left';
     });
-
-    if(stage === 3){
-      // horizontal gap: 안전지대2's right edge to 안전지대3's left edge
-      const gapStartM = S3_X_HILLB_TOP;
-      const gapEndM = S3_ZONE3_CENTER_M;
-      const gapM = gapEndM - gapStartM;
-      const gx1 = mToPx(gapStartM), gx2 = mToPx(gapEndM);
-      if(gx2 > -20 && gx1 < W+20){
-        const gy = groundYAtM((gapStartM+gapEndM)/2) - 22;
-        ctx.strokeStyle = '#A79F8C';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3,3]);
-        ctx.beginPath();
-        ctx.moveTo(gx1, gy);
-        ctx.lineTo(gx2, gy);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.beginPath(); ctx.moveTo(gx1, gy-6); ctx.lineTo(gx1, gy+6); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(gx2, gy-6); ctx.lineTo(gx2, gy+6); ctx.stroke();
-        const gMidX = (gx1+gx2)/2;
-        const gLabel = gapM.toFixed(1)+'m';
-        ctx.font = '700 20px "JetBrains Mono", monospace';
-        const gtw = ctx.measureText(gLabel).width;
-        ctx.fillStyle = '#F7F4EC';
-        ctx.fillRect(gMidX-gtw/2-6, gy-27, gtw+12, 22);
-        ctx.fillStyle = '#242220';
-        ctx.textAlign = 'left';
-        ctx.fillText(gLabel, gMidX-gtw/2, gy-10);
-      }
-    }
   }
 
   function drawGrid(){
@@ -3248,7 +3217,7 @@
     bands.forEach((b)=>{
       const x1 = mToPx(b.startM), x2 = mToPx(b.endM);
       if(x2 <= x1) return;
-      const groundY = (gameStage === 3) ? groundYAtM((b.startM+b.endM)/2) : mainLaneY;
+      const groundY = (gameStage === 3) ? groundYAtM(S3_X_HILLB_TOP) : mainLaneY;
       const shieldY = groundY - (b.height||SHIELD_HEIGHT_M)*scale;
       const h = scale*0.55;
       const rgb = b.rgb, edgeRgb = b.edgeRgb;
@@ -3281,15 +3250,15 @@
       if(typeof b.speed === 'number'){
         ctx.globalAlpha = fadeAlpha;
         const label = b.speed + 'm/s';
-        ctx.font = '700 12px "JetBrains Mono", monospace';
+        ctx.font = '700 17px "JetBrains Mono", monospace';
         const labelX = (x1+x2)/2;
-        const labelY = shieldY - h/2 - 8;
+        const labelY = shieldY - h/2 - 11;
         const tw = ctx.measureText(label).width;
         ctx.fillStyle = '#F7F4EC';
-        ctx.fillRect(labelX-tw/2-4, labelY-13, tw+8, 16);
-        ctx.fillStyle = 'rgb('+edgeRgb+')';
+        ctx.fillRect(labelX-tw/2-6, labelY-18, tw+11, 22);
+        ctx.fillStyle = '#0F5A28';
         ctx.textAlign = 'center';
-        ctx.fillText(label, labelX, labelY-2);
+        ctx.fillText(label, labelX, labelY-3);
         ctx.textAlign = 'left';
       }
     });
@@ -3355,6 +3324,11 @@
     ctx.beginPath(); ctx.moveTo(x2-0.5, mainLaneY); ctx.lineTo(x2-0.5, mainLaneY+depth); ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,0.15)';
     ctx.beginPath(); ctx.moveTo(x1, mainLaneY+0.5); ctx.lineTo(x2, mainLaneY+0.5); ctx.stroke();
+    ctx.font = '800 11px -apple-system, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.fillText('구덩이', cx, mainLaneY+depth+14);
+    ctx.textAlign = 'left';
   }
 
   function drawFilledPit(cxM){
@@ -3625,10 +3599,29 @@
 
   function drawLegStart(){
     const x = mToPx(legStartM);
+    const groundY = (gameStage === 3) ? groundYAtM(legStartM) : mainLaneY;
     ctx.fillStyle = '#6B6459';
-    ctx.beginPath(); ctx.arc(x, mainLaneY, 3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, groundY, 3, 0, Math.PI*2); ctx.fill();
+
+    // the very first departure point (0m) stays marked for the whole stage,
+    // in place, even once the player has moved on to a later leg
+    const startX = mToPx(0);
+    const startGroundY = (gameStage === 3) ? groundYAtM(0) : mainLaneY;
+    const lineHeightM = (gameStage === 1) ? 2 : 3;
+    const topY = startGroundY - lineHeightM*scalePx();
+    ctx.strokeStyle = '#1F8A6E';
+    ctx.setLineDash([4,3]);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(startX, startGroundY);
+    ctx.lineTo(startX, topY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#1F8A6E';
     ctx.font = '11px -apple-system, sans-serif';
-    ctx.fillText(stage === 1 ? '출발지점' : '이어서 출발', x-20, mainLaneY-10);
+    ctx.textAlign = 'center';
+    ctx.fillText('출발지점', startX, topY-8);
+    ctx.textAlign = 'left';
   }
 
   function drawDistanceLabel(){
@@ -3893,11 +3886,6 @@
       drawWallGeneric(S2_ZONE1_WALL_LEFT_M, S2_WALL_THICKNESS_M, S2_WALL_HEIGHT_M, mainLaneY, sinkTW);
     }
     if(gameStage === 1){ drawDistanceLabel(); }
-    if(gameStage === 2){
-      drawS2ShieldRangeLabel(SHIELD1_TRACK_START_M, SHIELD1_TRACK_START_M + SHIELD1_TRACK_LEN_M);
-      drawS2ShieldRangeLabel(SHIELD2_TRACK_START_M, SHIELD2_TRACK_START_M + SHIELD2_TRACK_LEN_M);
-      drawS2ShieldRangeLabel(SHIELD3_TRACK_START_M, SHIELD3_TRACK_START_M + SHIELD3_TRACK_LEN_M);
-    }
     drawLegStart();
 
     if(gameStage !== 3){
@@ -4060,14 +4048,23 @@
     const zoneKeys = Object.keys(ACTIVE_ZONES).map(Number).sort((a,b)=>a-b);
     zoneKeys.forEach((k)=>{
       const z = ACTIVE_ZONES[k];
-      const zx1 = mapX(z.targetLeftM), zx2 = mapX(z.targetRightM);
+      let zx1 = mapX(z.targetLeftM), zx2 = mapX(z.targetRightM);
+      // cap how wide any single zone's marker can look on the minimap, so a
+      // genuinely wide landing zone (e.g. 안전지대2 in stage3) doesn't visually
+      // dwarf the other, narrower zones — keeps the markers balanced at a glance
+      const capW = Math.max(4, usableW*0.025);
+      if(zx2 - zx1 > capW){
+        const zc = (zx1+zx2)/2;
+        zx1 = zc - capW/2;
+        zx2 = zc + capW/2;
+      }
       const zy = mapY((z.targetLeftM+z.targetRightM)/2);
       ctx.fillStyle = '#1F8A6E';
       ctx.fillRect(zx1, zy-Math.max(2,mmH*0.1), Math.max(2, zx2-zx1), Math.max(4,mmH*0.2));
     });
 
     // distance labels between consecutive safe zones
-    if(gameStage !== 3){
+    if(gameStage === 1){
     ctx.font = '700 ' + Math.max(7, mmH*0.15) + 'px "JetBrains Mono", monospace';
     ctx.fillStyle = '#1F8A6E';
     ctx.textBaseline = 'alphabetic';
