@@ -28,11 +28,10 @@
   }
   .ios-steps b{ color:#D8B24A; }
   .share-icon{ display:inline-block; padding:1px 6px; border:1px solid #ABA593; border-radius:4px; font-size:12px; }
-  .play-link{
-    color:#7A7566; font-size:12.5px; text-decoration:underline; text-underline-offset:3px;
-    -webkit-tap-highlight-color:transparent;
-  }
   .status{ color:#ABA593; font-size:13px; margin-bottom:20px; display:none; }
+  .fallback{
+    display:none; color:#ABA593; font-size:13.5px; line-height:1.7; max-width:280px;
+  }
 </style>
 </head>
 <body>
@@ -50,7 +49,7 @@
     3. 오른쪽 위 <b>"추가"</b>를 누르면 완료돼요!
   </div>
 
-  <a class="play-link" href="index.html">설치 없이 바로 플레이하기 →</a>
+  <p class="fallback" id="fallbackMsg">이 브라우저에서는 자동 설치가 지원되지 않아요.<br>Chrome, Safari, Edge 등 최신 브라우저에서<br>다시 열어봐 주세요.</p>
 
 <script>
   (function(){
@@ -73,6 +72,8 @@
       e.preventDefault();
       deferredPrompt = e;
       installBtn.style.display = 'inline-block';
+      var fb = document.getElementById('fallbackMsg');
+      if(fb) fb.style.display = 'none';
     });
 
     installBtn.addEventListener('click', function(){
@@ -98,6 +99,13 @@
 
     if(isIOS){
       iosSteps.style.display = 'block';
+    } else {
+      var fallbackMsg = document.getElementById('fallbackMsg');
+      setTimeout(function(){
+        if(!deferredPrompt){
+          fallbackMsg.style.display = 'block';
+        }
+      }, 2500);
     }
   })();
 </script>
