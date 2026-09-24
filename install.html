@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>물리학으로 폭탄 피하기 - 설치</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; background:#0A0A0A; color:#F2EDE0;
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Pretendard",sans-serif;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    min-height:100vh; min-height:100dvh; text-align:center; padding:28px 24px;
+  }
+  .icon{ width:96px; height:96px; border-radius:22px; margin-bottom:22px; box-shadow:0 4px 18px rgba(0,0,0,0.4); }
+  h1{ font-size:19px; margin:0 0 8px; letter-spacing:0.02em; }
+  p.sub{ color:#ABA593; font-size:13.5px; margin:0 0 30px; line-height:1.6; max-width:280px; }
+  #installBtn{
+    font-family:inherit; font-size:16px; font-weight:700; padding:15px 36px; border-radius:8px;
+    border:none; background:#1F8A6E; color:#fff; cursor:pointer; margin-bottom:16px;
+    display:none; -webkit-tap-highlight-color:transparent;
+  }
+  #installBtn:active{ transform:scale(0.97); }
+  .ios-steps{
+    display:none; text-align:left; background:#17140F; border:1px solid #2A251E; border-radius:10px;
+    padding:18px 20px; margin-bottom:22px; font-size:13.5px; line-height:1.9; max-width:300px;
+  }
+  .ios-steps b{ color:#D8B24A; }
+  .share-icon{ display:inline-block; padding:1px 6px; border:1px solid #ABA593; border-radius:4px; font-size:12px; }
+  .play-link{
+    color:#7A7566; font-size:12.5px; text-decoration:underline; text-underline-offset:3px;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .status{ color:#ABA593; font-size:13px; margin-bottom:20px; display:none; }
+</style>
+</head>
+<body>
+  <img class="icon" src="icon-192.png" alt="아이콘">
+  <h1>물리학으로 폭탄 피하기</h1>
+  <p class="sub">홈 화면에 추가하면 앱처럼 아이콘을 눌러 바로 실행할 수 있어요.</p>
+
+  <button id="installBtn" type="button">홈 화면에 추가</button>
+  <p class="status" id="statusMsg"></p>
+
+  <div class="ios-steps" id="iosSteps">
+    아이폰 · 아이패드에서 설치하는 방법<br><br>
+    1. 하단(또는 상단)의 <span class="share-icon">공유</span> 버튼을 눌러주세요<br>
+    2. <b>"홈 화면에 추가"</b>를 선택해주세요<br>
+    3. 오른쪽 위 <b>"추가"</b>를 누르면 완료돼요!
+  </div>
+
+  <a class="play-link" href="index.html">설치 없이 바로 플레이하기 →</a>
+
+<script>
+  (function(){
+    var installBtn = document.getElementById('installBtn');
+    var iosSteps = document.getElementById('iosSteps');
+    var statusMsg = document.getElementById('statusMsg');
+    var deferredPrompt = null;
+
+    // Already installed and launched from the home-screen icon? Just go straight in.
+    var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if(isStandalone){
+      location.replace('index.html');
+      return;
+    }
+
+    var ua = navigator.userAgent || '';
+    var isIOS = /iPhone|iPad|iPod/i.test(ua) && !window.MSStream;
+
+    window.addEventListener('beforeinstallprompt', function(e){
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = 'inline-block';
+    });
+
+    installBtn.addEventListener('click', function(){
+      if(!deferredPrompt) return;
+      installBtn.disabled = true;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function(choice){
+        deferredPrompt = null;
+        if(choice.outcome === 'accepted'){
+          statusMsg.textContent = '설치 중입니다…';
+          statusMsg.style.display = 'block';
+        } else {
+          installBtn.disabled = false;
+        }
+      });
+    });
+
+    window.addEventListener('appinstalled', function(){
+      statusMsg.textContent = '설치 완료! 게임을 시작합니다…';
+      statusMsg.style.display = 'block';
+      setTimeout(function(){ location.replace('index.html'); }, 600);
+    });
+
+    if(isIOS){
+      iosSteps.style.display = 'block';
+    }
+  })();
+</script>
+</body>
+</html>
