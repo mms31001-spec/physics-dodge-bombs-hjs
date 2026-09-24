@@ -32,6 +32,12 @@
   .fallback{
     display:none; color:#ABA593; font-size:13.5px; line-height:1.7; max-width:280px;
   }
+  .inapp-steps{
+    display:none; text-align:left; background:#17140F; border:1px solid #2A251E; border-radius:10px;
+    padding:18px 20px; margin-bottom:22px; font-size:13.5px; line-height:1.9; max-width:300px;
+  }
+  .inapp-steps b{ color:#D8B24A; }
+  .menu-icon{ display:inline-block; padding:1px 8px; border:1px solid #ABA593; border-radius:4px; font-size:12px; }
 </style>
 </head>
 <body>
@@ -47,6 +53,13 @@
     1. 하단(또는 상단)의 <span class="share-icon">공유</span> 버튼을 눌러주세요<br>
     2. <b>"홈 화면에 추가"</b>를 선택해주세요<br>
     3. 오른쪽 위 <b>"추가"</b>를 누르면 완료돼요!
+  </div>
+
+  <div class="inapp-steps" id="inappSteps">
+    카카오톡 안에서는 설치 기능이 제한되어 있어요.<br>먼저 <b>실제 브라우저</b>로 열어주세요.<br><br>
+    1. 우측 상단(또는 하단)의 <span class="menu-icon">⋮ / •••</span> 메뉴를 눌러주세요<br>
+    2. <b>"다른 브라우저로 열기"</b>(또는 <b>"Safari로 열기"</b>)를 선택해주세요<br>
+    3. 열린 브라우저에서 이 페이지가 다시 뜨면, 그때 안내에 따라 설치해주세요
   </div>
 
   <p class="fallback" id="fallbackMsg">이 브라우저에서는 자동 설치가 지원되지 않아요.<br>Chrome, Safari, Edge 등 최신 브라우저에서<br>다시 열어봐 주세요.</p>
@@ -67,6 +80,12 @@
 
     var ua = navigator.userAgent || '';
     var isIOS = /iPhone|iPad|iPod/i.test(ua) && !window.MSStream;
+    var isInApp = /KAKAOTALK/i.test(ua) || /FBAN|FBAV/i.test(ua) || /Instagram/i.test(ua) || /NAVER\(/i.test(ua) || /Line\//i.test(ua);
+
+    if(isInApp){
+      document.getElementById('inappSteps').style.display = 'block';
+      return;
+    }
 
     window.addEventListener('beforeinstallprompt', function(e){
       e.preventDefault();
